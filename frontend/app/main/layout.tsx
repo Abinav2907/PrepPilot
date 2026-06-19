@@ -1,5 +1,7 @@
 "use client";
 
+import { useState } from "react";
+
 import Sidebar from "@/components/Sidebar";
 import TopNavbar from "@/components/TopNavbar";
 
@@ -8,17 +10,31 @@ export default function MainLayout({
 }: {
   children: React.ReactNode;
 }) {
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
   return (
     <div className="min-h-screen bg-[#020617] text-white">
       {/* Desktop Sidebar */}
-      <Sidebar />
+      <div className="hidden lg:block">
+        <Sidebar />
+      </div>
+
+      {/* Mobile Sidebar */}
+      {sidebarOpen && (
+        <div className="fixed inset-0 z-50 lg:hidden">
+          <div
+            className="absolute inset-0 bg-black/60"
+            onClick={() => setSidebarOpen(false)}
+          />
+
+          <Sidebar />
+        </div>
+      )}
 
       {/* Main Content */}
       <div className="lg:ml-[320px]">
-        {/* Fixed Top Navbar */}
-        <TopNavbar />
+        <TopNavbar onMenuClick={() => setSidebarOpen(true)} />
 
-        {/* Page Content */}
         <main
           className="
             pt-24

@@ -63,8 +63,7 @@ export default function Sidebar() {
   return (
     <aside
       className="
-hidden
-lg:flex
+flex
 fixed
 left-0
 top-0

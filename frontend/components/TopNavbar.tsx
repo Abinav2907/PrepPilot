@@ -3,7 +3,11 @@
 import { Bell, Menu } from "lucide-react";
 import { usePathname } from "next/navigation";
 
-export default function TopNavbar() {
+type TopNavbarProps = {
+  onMenuClick?: () => void;
+};
+
+export default function TopNavbar({ onMenuClick }: TopNavbarProps) {
   const pathname = usePathname();
 
   const title = pathname.split("/").pop()?.replace("-", " ") || "Dashboard";
@@ -29,21 +33,22 @@ border-white/10
           {/* Mobile Menu Button */}
 
           <button
-            className="
-            lg:hidden
-            h-11
-            w-11
-            rounded-xl
-            bg-white/5
-            flex
-            items-center
-            justify-center
-          "
+            onClick={onMenuClick}
             title="Open menu"
+            aria-label="Open menu"
+            className="
+  lg:hidden
+  h-11
+  w-11
+  rounded-xl
+  bg-white/5
+  flex
+  items-center
+  justify-center
+"
           >
             <Menu size={20} />
           </button>
-
           <div>
             <h1 className="capitalize text-xl md:text-2xl font-bold">
               {title}
