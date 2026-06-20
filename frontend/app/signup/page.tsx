@@ -1,5 +1,4 @@
 "use client";
-
 import Link from "next/link";
 import { useState } from "react";
 import { useRouter } from "next/navigation";
@@ -15,8 +14,38 @@ export default function SignupPage() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  const sendOTP = async () => {
+    try {
+      const res = await fetch("http://localhost:5000/api/auth/send-otp", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (data.success) {
+        alert("OTP Sent Successfully");
+        return true;
+      }
+
+      alert(data.message || "Failed to send OTP");
+      return false;
+    } catch (error) {
+      console.error(error);
+      alert("Server Error");
+      return false;
+    }
+  };
+
   const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+
     const usernameRegex = /^[a-zA-Z0-9_]{3,20}$/;
 
     if (!usernameRegex.test(username)) {
@@ -39,6 +68,7 @@ export default function SignupPage() {
       );
       return;
     }
+
     if (password !== confirmPassword) {
       alert("Passwords do not match");
       return;
@@ -46,26 +76,21 @@ export default function SignupPage() {
 
     setLoading(true);
 
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          username,
-        },
-      },
-    });
+    const otpSent = await sendOTP();
 
     setLoading(false);
 
-    if (error) {
-      alert(error.message);
-      return;
-    }
+    if (!otpSent) return;
 
-    alert("Verification email sent! Please check your inbox.");
-    router.push("/login");
+    router.push(
+      `/verify-otp?email=${encodeURIComponent(
+        email,
+      )}&username=${encodeURIComponent(
+        username,
+      )}&password=${encodeURIComponent(password)}`,
+    );
   };
+
   const handleGoogleLogin = async () => {
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "google",

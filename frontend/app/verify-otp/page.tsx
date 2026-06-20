@@ -9,6 +9,8 @@ export default function VerifyOtpPage() {
   const router = useRouter();
   const [timer, setTimer] = useState(60);
   const email = searchParams.get("email") || "";
+  const username = searchParams.get("username") || "";
+  const password = searchParams.get("password") || "";
   const [loading, setLoading] = useState(false);
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
 
@@ -91,25 +93,63 @@ export default function VerifyOtpPage() {
   const isOtpComplete = otp.every((digit) => digit !== "");
   const handleVerifyOtp = async () => {
     if (loading) return;
+
     const otpCode = otp.join("");
 
     setLoading(true);
 
-    const { error } = await supabase.auth.verifyOtp({
-      email,
-      token: otpCode,
-      type: "email",
-    });
+    try {
+      const res = await fetch("http://localhost:5000/api/auth/verify-otp", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email,
+          otp: otpCode,
+        }),
+      });
 
-    setLoading(false);
+      const data = await res.json();
 
-    if (error) {
-      alert(error.message);
-      return;
+      if (!data.success) {
+        setLoading(false);
+        alert(data.message || "Invalid OTP");
+        return;
+      }
+
+      console.log("EMAIL =", email);
+      console.log("USERNAME =", username);
+      console.log("PASSWORD =", password);
+
+      const { data: signupData, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            username: username,
+            display_name: username,
+          },
+        },
+      });
+
+      if (error) {
+        setLoading(false);
+        alert(error.message);
+        return;
+      }
+
+      console.log(signupData);
+
+      setLoading(false);
+
+      alert("Account created successfully!");
+      router.push("/login");
+    } catch (err) {
+      console.error(err);
+      setLoading(false);
+      alert("Something went wrong");
     }
-
-    alert("Email verified successfully!");
-    router.push("/login");
   };
   return (
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#050816] px-4 text-white">

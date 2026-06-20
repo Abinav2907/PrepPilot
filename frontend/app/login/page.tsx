@@ -43,12 +43,6 @@ export default function LoginPage() {
       return;
     }
 
-    if (!data.user?.email_confirmed_at) {
-      alert("Please verify your email first");
-      await supabase.auth.signOut();
-      return;
-    }
-
     router.push("/onboarding");
   };
   return (
