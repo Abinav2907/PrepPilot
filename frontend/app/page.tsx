@@ -1,8 +1,9 @@
 "use client";
 
 import { motion } from "framer-motion";
-
+import { useRouter } from "next/navigation";
 export default function Home() {
+  const router = useRouter();
   return (
     <main className="relative min-h-screen overflow-hidden bg-[#050816] text-white">
       {/* Background Glow Effects */}
@@ -34,9 +35,27 @@ export default function Home() {
           </motion.div>
 
           <div className="flex items-center gap-4">
-            <button className="text-gray-300 hover:text-white">Login</button>
+            <button
+              onClick={() => router.push("/login")}
+              className="
+    px-5
+    py-2.5
+    rounded-xl
+    text-gray-300
+    hover:text-white
+    hover:bg-white/5
+    transition-all
+    duration-300
+    font-medium
+  "
+            >
+              Login
+            </button>
 
-            <button className="rounded-xl bg-gradient-to-r from-purple-600 to-cyan-500 px-5 py-2 font-semibold">
+            <button
+              onClick={() => router.push("/signup")}
+              className="rounded-xl bg-gradient-to-r from-purple-600 to-cyan-500 px-5 py-2 font-semibold"
+            >
               Get Started
             </button>
           </div>
@@ -81,8 +100,47 @@ export default function Home() {
             transition={{ delay: 0.5 }}
             className="flex flex-col justify-center gap-4 sm:flex-row"
           >
-            <button className="rounded-2xl bg-gradient-to-r from-purple-600 to-cyan-500 px-10 py-5 text-lg font-semibold shadow-[0_0_40px_rgba(139,92,246,0.4)] transition hover:scale-105">
-              Get Started Free
+            <button
+              onClick={() => router.push("/signup")}
+              className="
+    group
+    relative
+    overflow-hidden
+    rounded-2xl
+    bg-gradient-to-r
+    from-purple-600
+    via-violet-500
+    to-cyan-500
+    px-10
+    py-5
+    text-lg
+    font-bold
+    text-white
+    shadow-[0_0_40px_rgba(139,92,246,0.35)]
+    transition-all
+    duration-300
+    hover:scale-105
+    hover:shadow-[0_0_60px_rgba(34,211,238,0.4)]
+  "
+            >
+              <span className="relative z-10 flex items-center justify-center gap-2">
+                Get Started Free
+                <span className="transition-transform duration-300 group-hover:translate-x-1">
+                  →
+                </span>
+              </span>
+
+              <div
+                className="
+      absolute
+      inset-0
+      bg-white/10
+      opacity-0
+      group-hover:opacity-100
+      transition-opacity
+      duration-300
+    "
+              />
             </button>
           </motion.div>
 
@@ -190,7 +248,25 @@ export default function Home() {
                   </p>
                 </div>
 
-                <button className="rounded-2xl bg-gradient-to-r from-purple-600 to-cyan-500 px-6 py-3 font-semibold">
+                <button
+                  onClick={() => router.push("/login")}
+                  className="
+    rounded-2xl
+    bg-gradient-to-r
+    from-purple-600
+    to-cyan-500
+    px-6
+    py-3
+    font-semibold
+    text-white
+    shadow-lg
+    shadow-purple-500/20
+    transition-all
+    duration-300
+    hover:scale-105
+    hover:shadow-cyan-500/20
+  "
+                >
                   Start Interview
                 </button>
               </div>
@@ -362,8 +438,47 @@ export default function Home() {
               </p>
 
               <div className="flex flex-col justify-center gap-4 sm:flex-row">
-                <button className="rounded-2xl bg-gradient-to-r from-purple-600 to-cyan-500 px-10 py-5 text-lg font-semibold transition hover:scale-105">
-                  Get Started Free
+                <button
+                  onClick={() => router.push("/signup")}
+                  className="
+    group
+    relative
+    overflow-hidden
+    rounded-2xl
+    bg-gradient-to-r
+    from-purple-600
+    via-violet-500
+    to-cyan-500
+    px-10
+    py-5
+    text-lg
+    font-bold
+    text-white
+    shadow-[0_0_40px_rgba(139,92,246,0.35)]
+    transition-all
+    duration-300
+    hover:scale-105
+    hover:shadow-[0_0_60px_rgba(34,211,238,0.4)]
+  "
+                >
+                  <span className="relative z-10 flex items-center justify-center gap-2">
+                    Get Started Free
+                    <span className="transition-transform duration-300 group-hover:translate-x-1">
+                      →
+                    </span>
+                  </span>
+
+                  <div
+                    className="
+      absolute
+      inset-0
+      bg-white/10
+      opacity-0
+      group-hover:opacity-100
+      transition-opacity
+      duration-300
+    "
+                  />
                 </button>
               </div>
             </div>
