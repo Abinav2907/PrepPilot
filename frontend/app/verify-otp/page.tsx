@@ -135,7 +135,15 @@ export default function VerifyOtpPage() {
 
       if (error) {
         setLoading(false);
-        alert(error.message);
+        const errorMessage = error.message || "Something went wrong";
+        const duplicateMessage =
+          /already exist(s)?|already registered|duplicate email|duplicate user/i.test(
+            errorMessage,
+          )
+            ? "user already exist"
+            : errorMessage;
+
+        alert(duplicateMessage);
         return;
       }
 

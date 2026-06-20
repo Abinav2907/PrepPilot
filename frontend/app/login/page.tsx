@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { Eye, EyeOff } from "lucide-react";
+import Image from "next/image";
 export default function LoginPage() {
   const router = useRouter();
   const [showPassword, setShowPassword] = useState(false);
@@ -143,9 +144,15 @@ export default function LoginPage() {
           <button
             type="button"
             onClick={handleGoogleLogin}
-            className="w-full rounded-xl border border-white/10 bg-white/5 py-3 font-medium hover:bg-white/10"
+            className="w-full rounded-xl border border-white/10 bg-white/5 py-3 font-medium hover:bg-white/10 flex items-center justify-center gap-3"
           >
-            Continue With Google
+            <Image
+              src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
+              alt="Google"
+              width={20}
+              height={20}
+            />
+            <span>Continue With Google</span>
           </button>
 
           <p className="mt-8 text-center text-gray-400">

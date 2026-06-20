@@ -60,7 +60,8 @@ export default function SignupPage() {
       return;
     }
 
-    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+    const passwordRegex =
+      /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)(?=.*[@$!%*?&])[A-Za-z\d@$!%*?&]{8,}$/;
 
     if (!passwordRegex.test(password)) {
       alert(
@@ -262,8 +263,13 @@ export default function SignupPage() {
           <button
             type="button"
             onClick={handleGoogleLogin}
-            className="w-full rounded-xl border border-white/10 bg-white/5 py-3 font-medium hover:bg-white/10"
+            className="w-full rounded-xl border border-white/10 bg-white/5 py-3 font-medium hover:bg-white/10 flex items-center justify-center gap-3"
           >
+            <img
+              src="https://www.gstatic.com/firebasejs/ui/2.0.0/images/auth/google.svg"
+              alt="Google"
+              className="h-5 w-5"
+            />
             Continue With Google
           </button>
 
