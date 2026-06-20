@@ -1,13 +1,47 @@
 "use client";
-
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { useRef, useState } from "react";
 
+import { useSearchParams, useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
 export default function VerifyOtpPage() {
+  const searchParams = useSearchParams();
+  const router = useRouter();
+  const [timer, setTimer] = useState(60);
+  const email = searchParams.get("email") || "";
+  const [loading, setLoading] = useState(false);
   const [otp, setOtp] = useState(["", "", "", "", "", ""]);
 
   const inputRefs = useRef<(HTMLInputElement | null)[]>([]);
+  useEffect(() => {
+    if (timer === 0) return;
 
+    const interval = setInterval(() => {
+      setTimer((prev) => prev - 1);
+    }, 1000);
+
+    return () => clearInterval(interval);
+  }, [timer]);
+  //   useEffect(() => {
+  //     if (!email) {
+  //       router.push("/signup");
+  //     }
+  //   }, [email, router]);
+  const handleResendOtp = async () => {
+    if (timer > 0) return;
+
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+    });
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    setTimer(60);
+    alert("OTP sent again");
+  };
   const handleChange = (value: string, index: number) => {
     if (!/^\d*$/.test(value)) return;
 
@@ -55,7 +89,28 @@ export default function VerifyOtpPage() {
   };
 
   const isOtpComplete = otp.every((digit) => digit !== "");
+  const handleVerifyOtp = async () => {
+    if (loading) return;
+    const otpCode = otp.join("");
 
+    setLoading(true);
+
+    const { error } = await supabase.auth.verifyOtp({
+      email,
+      token: otpCode,
+      type: "email",
+    });
+
+    setLoading(false);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    alert("Email verified successfully!");
+    router.push("/login");
+  };
   return (
     <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#050816] px-4 text-white">
       {/* Background Glow */}
@@ -81,7 +136,7 @@ export default function VerifyOtpPage() {
         <p className="mb-8 text-center text-gray-400">
           We have sent a verification code to
           <br />
-          <span className="text-cyan-400">your email address</span>
+          <span className="text-cyan-400">{email}</span>
         </p>
 
         {/* OTP Inputs */}
@@ -96,6 +151,9 @@ export default function VerifyOtpPage() {
               inputMode="numeric"
               maxLength={1}
               value={digit}
+              placeholder="•"
+              title={`OTP Digit ${index + 1}`}
+              aria-label={`OTP Digit ${index + 1}`}
               onChange={(e) => handleChange(e.target.value, index)}
               onKeyDown={(e) => handleKeyDown(e, index)}
               onPaste={handlePaste}
@@ -120,7 +178,8 @@ export default function VerifyOtpPage() {
 
         {/* Verify Button */}
         <button
-          disabled={!isOtpComplete}
+          onClick={handleVerifyOtp}
+          disabled={!isOtpComplete || loading}
           className={`
             w-full
             rounded-xl
@@ -137,15 +196,23 @@ export default function VerifyOtpPage() {
             }
           `}
         >
-          Verify OTP
+          {loading ? "Verifying..." : "Verify OTP"}
         </button>
 
         {/* Resend */}
         <div className="mt-6 text-center">
           <p className="text-sm text-gray-400">Didn't receive the code?</p>
 
-          <button className="mt-2 font-medium text-cyan-400 hover:text-cyan-300">
-            Resend OTP (60s)
+          <button
+            onClick={handleResendOtp}
+            disabled={timer > 0}
+            className={`mt-2 font-medium transition-all ${
+              timer > 0
+                ? "cursor-not-allowed text-gray-500"
+                : "text-cyan-400 hover:text-cyan-300"
+            }`}
+          >
+            {timer > 0 ? `Resend OTP (${timer}s)` : "Resend OTP"}
           </button>
         </div>
 

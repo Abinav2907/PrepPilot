@@ -1,7 +1,8 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
 
 interface OnboardingData {
   fullName: string;
@@ -38,7 +39,24 @@ export default function OnboardingPage() {
 
     setError("");
   };
+  useEffect(() => {
+    const createProfile = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
+      if (!user) return;
+
+      await supabase.from("profiles").upsert({
+        id: user.id,
+        email: user.email,
+        username:
+          user.user_metadata.full_name || user.user_metadata.name || "User",
+      });
+    };
+
+    createProfile();
+  }, []);
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -129,7 +147,10 @@ export default function OnboardingPage() {
             </div>
 
             <div>
-              <label htmlFor="targetRole" className="mb-2 block text-sm text-gray-400">
+              <label
+                htmlFor="targetRole"
+                className="mb-2 block text-sm text-gray-400"
+              >
                 Target Role *
               </label>
 
@@ -157,7 +178,10 @@ export default function OnboardingPage() {
             </div>
 
             <div>
-              <label htmlFor="experienceLevel" className="mb-2 block text-sm text-gray-400">
+              <label
+                htmlFor="experienceLevel"
+                className="mb-2 block text-sm text-gray-400"
+              >
                 Experience Level *
               </label>
 

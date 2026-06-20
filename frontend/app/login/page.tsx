@@ -1,8 +1,56 @@
 "use client";
 
 import Link from "next/link";
-
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
+import { Eye, EyeOff } from "lucide-react";
 export default function LoginPage() {
+  const router = useRouter();
+  const [showPassword, setShowPassword] = useState(false);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const handleGoogleLogin = async () => {
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: "http://localhost:3000/onboarding",
+      },
+    });
+
+    console.log(data);
+    console.log(error);
+
+    if (error) {
+      alert(error.message);
+    }
+  };
+  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+
+    setLoading(true);
+
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email,
+      password,
+    });
+
+    setLoading(false);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    if (!data.user?.email_confirmed_at) {
+      alert("Please verify your email first");
+      await supabase.auth.signOut();
+      return;
+    }
+
+    router.push("/onboarding");
+  };
   return (
     <main className="relative flex min-h-screen overflow-hidden bg-[#050816] text-white">
       {/* Background Glow */}
@@ -47,13 +95,15 @@ export default function LoginPage() {
 
           <p className="mb-8 text-gray-400">Welcome back to PrepPilot</p>
 
-          <form className="space-y-5">
+          <form onSubmit={handleLogin} className="space-y-5">
             <div>
               <label className="mb-2 block text-sm text-gray-400">Email</label>
 
               <input
                 type="email"
                 placeholder="Enter your email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 className="w-full rounded-xl border border-white/10 bg-[#111827] px-4 py-3 text-sm sm:text-base outline-none focus:border-purple-500"
               />
             </div>
@@ -63,18 +113,30 @@ export default function LoginPage() {
                 Password
               </label>
 
-              <input
-                type="password"
-                placeholder="Enter your password"
-                className="w-full rounded-xl border border-white/10 bg-[#111827] px-4 py-3 text-sm sm:text-base outline-none focus:border-purple-500"
-              />
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Enter your password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full rounded-xl border border-white/10 bg-[#111827] px-4 py-3 pr-12 text-sm sm:text-base outline-none focus:border-purple-500"
+                />
+
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                >
+                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+              </div>
             </div>
 
             <button
               type="submit"
               className="w-full rounded-xl bg-gradient-to-r from-purple-600 to-cyan-500 py-3 sm:py-4 text-sm sm:text-base font-semibold"
             >
-              Login
+              {loading ? "Logging In..." : "Login"}
             </button>
           </form>
 
@@ -84,7 +146,11 @@ export default function LoginPage() {
             <div className="h-px flex-1 bg-white/10" />
           </div>
 
-          <button className="w-full rounded-xl border border-white/10 bg-white/5 py-3 font-medium hover:bg-white/10">
+          <button
+            type="button"
+            onClick={handleGoogleLogin}
+            className="w-full rounded-xl border border-white/10 bg-white/5 py-3 font-medium hover:bg-white/10"
+          >
             Continue With Google
           </button>
 

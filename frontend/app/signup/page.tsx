@@ -1,8 +1,86 @@
 "use client";
 
 import Link from "next/link";
-
+import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
+import { Eye, EyeOff } from "lucide-react";
 export default function SignupPage() {
+  const router = useRouter();
+
+  const [username, setUsername] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+  const handleSignup = async (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const usernameRegex = /^[a-zA-Z0-9_]{3,20}$/;
+
+    if (!usernameRegex.test(username)) {
+      alert("Username must be 3-20 characters");
+      return;
+    }
+
+    const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+    if (!emailRegex.test(email)) {
+      alert("Enter a valid email");
+      return;
+    }
+
+    const passwordRegex = /^(?=.*[a-z])(?=.*[A-Z])(?=.*\d).{8,}$/;
+
+    if (!passwordRegex.test(password)) {
+      alert(
+        "Password must contain uppercase, lowercase, number and minimum 8 characters",
+      );
+      return;
+    }
+    if (password !== confirmPassword) {
+      alert("Passwords do not match");
+      return;
+    }
+
+    setLoading(true);
+
+    const { error } = await supabase.auth.signUp({
+      email,
+      password,
+      options: {
+        data: {
+          username,
+        },
+      },
+    });
+
+    setLoading(false);
+
+    if (error) {
+      alert(error.message);
+      return;
+    }
+
+    alert("Verification email sent! Please check your inbox.");
+    router.push("/login");
+  };
+  const handleGoogleLogin = async () => {
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: "google",
+      options: {
+        redirectTo: "http://localhost:3000/onboarding",
+      },
+    });
+
+    console.log(data);
+    console.log(error);
+
+    if (error) {
+      alert(error.message);
+    }
+  };
   return (
     <main className="relative flex min-h-screen overflow-hidden bg-[#050816] text-white">
       {/* Background Glow */}
@@ -49,8 +127,7 @@ export default function SignupPage() {
           <p className="mb-8 text-gray-400">
             Join PrepPilot and start preparing smarter
           </p>
-
-          <form className="space-y-5">
+          <form onSubmit={handleSignup} className="space-y-5">
             <div>
               <label className="mb-2 block text-sm text-gray-400">
                 Username
@@ -58,50 +135,97 @@ export default function SignupPage() {
 
               <input
                 type="text"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
                 placeholder="Choose a username"
                 className="w-full rounded-xl border border-white/10 bg-[#111827] px-4 py-3 text-sm sm:text-base outline-none focus:border-purple-500"
               />
             </div>
 
             <div>
-              <label className="mb-2 block text-sm text-gray-400">Email</label>
+              <label
+                htmlFor="email"
+                className="mb-2 block text-sm text-gray-400"
+              >
+                Email
+              </label>
 
               <input
+                id="email"
                 type="email"
                 placeholder="Enter your email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
                 className="w-full rounded-xl border border-white/10 bg-[#111827] px-4 py-3 text-sm sm:text-base outline-none focus:border-purple-500"
               />
             </div>
 
             <div>
-              <label className="mb-2 block text-sm text-gray-400">
+              <label
+                htmlFor="password"
+                className="mb-2 block text-sm text-gray-400"
+              >
                 Password
               </label>
 
-              <input
-                type="password"
-                placeholder="Create a password"
-                className="w-full rounded-xl border border-white/10 bg-[#111827] px-4 py-3 text-sm sm:text-base outline-none focus:border-purple-500"
-              />
+              <div className="relative">
+                <input
+                  id="password"
+                  type={showPassword ? "text" : "password"}
+                  placeholder="Create a password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="w-full rounded-xl border border-white/10 bg-[#111827] px-4 py-3 pr-12 text-sm sm:text-base outline-none focus:border-purple-500"
+                />
+
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                >
+                  {showPassword ? <EyeOff size={20} /> : <Eye size={20} />}
+                </button>
+              </div>
             </div>
 
             <div>
-              <label className="mb-2 block text-sm text-gray-400">
+              <label
+                htmlFor="confirmPassword"
+                className="mb-2 block text-sm text-gray-400"
+              >
                 Confirm Password
               </label>
 
-              <input
-                type="password"
-                placeholder="Confirm password"
-                className="w-full rounded-xl border border-white/10 bg-[#111827] px-4 py-3 text-sm sm:text-base outline-none focus:border-purple-500"
-              />
+              <div className="relative">
+                <input
+                  id="confirmPassword"
+                  type={showConfirmPassword ? "text" : "password"}
+                  placeholder="Confirm your password"
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                  className="w-full rounded-xl border border-white/10 bg-[#111827] px-4 py-3 pr-12 text-sm sm:text-base outline-none focus:border-purple-500"
+                />
+
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-white"
+                >
+                  {showConfirmPassword ? (
+                    <EyeOff size={20} />
+                  ) : (
+                    <Eye size={20} />
+                  )}
+                </button>
+              </div>
             </div>
 
             <button
               type="submit"
-              className="w-full rounded-xl bg-gradient-to-r from-purple-600 to-cyan-500 py-3 sm:py-4 text-sm sm:text-base font-semibold"
+              disabled={loading}
+              className="w-full rounded-xl bg-gradient-to-r from-purple-600 to-cyan-500 py-3 sm:py-4 text-sm sm:text-base font-semibold disabled:opacity-50"
             >
-              Create Account
+              {loading ? "Creating Account..." : "Create Account"}
             </button>
           </form>
 
@@ -110,8 +234,11 @@ export default function SignupPage() {
             <span className="text-sm text-gray-500">OR</span>
             <div className="h-px flex-1 bg-white/10" />
           </div>
-
-          <button className="w-full rounded-xl border border-white/10 bg-white/5 py-3 sm:py-4 text-sm sm:text-base font-medium hover:bg-white/10">
+          <button
+            type="button"
+            onClick={handleGoogleLogin}
+            className="w-full rounded-xl border border-white/10 bg-white/5 py-3 font-medium hover:bg-white/10"
+          >
             Continue With Google
           </button>
 
