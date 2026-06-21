@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-
+import { supabase } from "@/lib/supabase";
 export default function ResumeUploadPage() {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -61,32 +61,64 @@ export default function ResumeUploadPage() {
       setUploading(true);
       setError("");
 
-      const formData = new FormData();
-      formData.append("resume", selectedFile);
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
-      // ==========================
-      // BACKEND API PLACEHOLDER
-      // ==========================
+      if (!user) {
+        setError("Please login first.");
+        return;
+      }
+      const { data: existingResume } = await supabase
+        .from("resumes")
+        .select("*")
+        .eq("user_id", user.id)
+        .maybeSingle();
+      if (existingResume) {
+        const oldFilePath = existingResume.file_url.split("/resumes/")[1];
 
-      /*
-      const response = await fetch(
-        "/api/upload-resume",
+        await supabase.storage.from("resumes").remove([oldFilePath]);
+
+        await supabase.from("resumes").delete().eq("id", existingResume.id);
+      }
+
+      const fileName = `${user.id}-${Date.now()}-${selectedFile.name}`;
+
+      const { error: uploadError } = await supabase.storage
+        .from("resumes")
+        .upload(fileName, selectedFile);
+
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      const { data: publicUrlData } = supabase.storage
+        .from("resumes")
+        .getPublicUrl(fileName);
+
+      const { error: dbError } = await supabase.from("resumes").upsert(
         {
-          method: "POST",
-          body: formData,
-        }
+          user_id: user.id,
+          file_name: selectedFile.name,
+          file_url: publicUrlData.publicUrl,
+        },
+        {
+          onConflict: "user_id",
+        },
       );
 
-      const data = await response.json();
-      */
+      if (dbError) {
+        throw dbError;
+      }
 
       setSuccess("Resume uploaded successfully!");
 
       setTimeout(() => {
         router.push("/resume-analysis");
       }, 1000);
-    } catch {
-      setError("Failed to upload resume.");
+    } catch (error: any) {
+      console.log(error);
+      setError(error.message);
     } finally {
       setUploading(false);
     }

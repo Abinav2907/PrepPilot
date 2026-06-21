@@ -39,24 +39,7 @@ export default function OnboardingPage() {
 
     setError("");
   };
-  useEffect(() => {
-    const createProfile = async () => {
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
 
-      if (!user) return;
-
-      await supabase.from("profiles").upsert({
-        id: user.id,
-        email: user.email,
-        username:
-          user.user_metadata.full_name || user.user_metadata.name || "User",
-      });
-    };
-
-    createProfile();
-  }, []);
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -73,19 +56,27 @@ export default function OnboardingPage() {
       setLoading(true);
       setError("");
 
-      // =====================
-      // BACKEND API CALL HERE
-      // =====================
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
-      /*
-      await fetch("/api/onboarding", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(formData),
+      if (!user) {
+        setError("User not found");
+        return;
+      }
+
+      const { error: insertError } = await supabase.from("profiles").upsert({
+        id: user.id,
+        full_name: formData.fullName,
+        degree: formData.experienceLevel,
+        target_role: formData.targetRole,
       });
-      */
+
+      if (insertError) {
+        console.log(insertError);
+        setError(insertError.message);
+        return;
+      }
 
       setSuccess("Profile completed successfully!");
 

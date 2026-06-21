@@ -16,7 +16,7 @@ export default function LoginPage() {
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
-        redirectTo: "http://localhost:3000/onboarding",
+        redirectTo: "http://localhost:3000/auth/callback",
       },
     });
 
@@ -44,7 +44,19 @@ export default function LoginPage() {
       return;
     }
 
-    router.push("/onboarding");
+    const user = data.user;
+
+    const { data: profile } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", user.id)
+      .single();
+
+    if (profile) {
+      router.push("/main/dashboard");
+    } else {
+      router.push("/onboarding");
+    }
   };
   return (
     <main className="relative flex min-h-screen overflow-hidden bg-[#050816] text-white">
