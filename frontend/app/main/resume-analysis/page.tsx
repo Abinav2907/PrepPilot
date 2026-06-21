@@ -1,41 +1,103 @@
 "use client";
 
 import { useRouter } from "next/navigation";
-
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
+import error from "next/dist/api/error";
 export default function ResumeAnalysisPage() {
   const router = useRouter();
+  const [resume, setResume] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [analysis, setAnalysis] = useState<any>(null);
 
-  const strengths = [
-    "Strong React Knowledge",
-    "TypeScript Experience",
-    "Responsive Design Skills",
-    "Good Project Portfolio",
-  ];
+  useEffect(() => {
+    loadResume();
+    loadAnalysis();
+  }, []);
 
-  const weaknesses = [
-    "Missing Docker Skills",
-    "Missing AWS Skills",
-    "Limited Backend Projects",
-    "No Internship Experience",
-  ];
+  const loadResume = async () => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
-  const missingSkills = [
-    "Docker",
-    "AWS",
-    "Kubernetes",
-    "CI/CD",
-    "System Design",
-    "MongoDB",
-  ];
+      if (!user) return;
 
-  const suggestions = [
-    "Add measurable achievements",
-    "Include GitHub repository links",
-    "Learn Docker and Containerization",
-    "Build a full-stack production project",
-    "Add deployment experience",
-  ];
+      const { data, error } = await supabase
+        .from("resumes")
+        .select("*")
+        .eq("user_id", user.id)
+        .single();
+      console.log("USER:", user);
+      console.log("RESUME DATA:", data);
+      console.log("RESUME ERROR:", error);
+      if (error) {
+        console.log(error);
+        return;
+      }
 
+      setResume(data);
+    } catch (error) {
+      console.log(error);
+    } finally {
+      setLoading(false);
+    }
+  };
+  const loadAnalysis = async () => {
+    try {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) return;
+
+      const { data, error } = await supabase
+        .from("resume_analysis")
+        .select("*")
+        .eq("user_id", user.id)
+        .single();
+
+      console.log("ANALYSIS:", data);
+
+      if (error) {
+        console.log(error);
+        return;
+      }
+
+      setAnalysis(data);
+    } catch (error) {
+      console.log(error);
+    }
+  };
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-screen text-white">
+        Loading Resume...
+      </div>
+    );
+  }
+  if (!resume) {
+    return (
+      <div className="flex flex-col items-center justify-center h-screen text-white gap-4">
+        <h2 className="text-3xl font-bold">No Resume Found</h2>
+
+        <button
+          onClick={() => router.push("/resume-upload")}
+          className="px-6 py-3 rounded-xl bg-purple-600"
+        >
+          Upload Resume
+        </button>
+      </div>
+    );
+  }
+  if (!analysis) {
+    return (
+      <div className="flex items-center justify-center h-screen text-white">
+        Loading Analysis...
+      </div>
+    );
+  }
   return (
     <div className="space-y-8">
       {/* ACTION BAR */}
@@ -69,14 +131,36 @@ export default function ResumeAnalysisPage() {
           Upload New Resume
         </button>
       </div>
+      <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-8">
+        <h3 className="text-2xl font-bold text-white">Uploaded Resume</h3>
 
+        <div className="mt-6 space-y-3">
+          <p>
+            <span className="font-semibold">File Name:</span> {resume.file_name}
+          </p>
+
+          <p>
+            <span className="font-semibold">Uploaded:</span>{" "}
+            {new Date(resume.created_at).toLocaleDateString()}
+          </p>
+
+          <button
+            onClick={() => window.open(resume.file_url, "_blank")}
+            className="mt-4 rounded-xl bg-cyan-600 px-5 py-2"
+          >
+            View Resume
+          </button>
+        </div>
+      </div>
       {/* SCORE CARDS */}
 
       <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
         <div className="rounded-3xl border border-purple-500/20 bg-purple-500/10 p-6">
           <p className="text-gray-400">Resume Score</p>
 
-          <h3 className="mt-3 text-5xl font-black text-purple-400">88</h3>
+          <h3 className="mt-3 text-5xl font-black text-purple-400">
+            {analysis.resume_score}
+          </h3>
 
           <p className="mt-2 text-sm text-gray-500">Overall Resume Quality</p>
         </div>
@@ -84,7 +168,9 @@ export default function ResumeAnalysisPage() {
         <div className="rounded-3xl border border-cyan-500/20 bg-cyan-500/10 p-6">
           <p className="text-gray-400">ATS Score</p>
 
-          <h3 className="mt-3 text-5xl font-black text-cyan-400">82</h3>
+          <h3 className="mt-3 text-5xl font-black text-cyan-400">
+            {analysis.ats_score}
+          </h3>
 
           <p className="mt-2 text-sm text-gray-500">ATS Compatibility</p>
         </div>
@@ -92,7 +178,9 @@ export default function ResumeAnalysisPage() {
         <div className="rounded-3xl border border-green-500/20 bg-green-500/10 p-6">
           <p className="text-gray-400">Matched Skills</p>
 
-          <h3 className="mt-3 text-5xl font-black text-green-400">14</h3>
+          <h3 className="mt-3 text-5xl font-black text-green-400">
+            {analysis.matched_skills}
+          </h3>
 
           <p className="mt-2 text-sm text-gray-500">Skills Identified</p>
         </div>
@@ -100,7 +188,9 @@ export default function ResumeAnalysisPage() {
         <div className="rounded-3xl border border-orange-500/20 bg-orange-500/10 p-6">
           <p className="text-gray-400">Missing Skills</p>
 
-          <h3 className="mt-3 text-5xl font-black text-orange-400">6</h3>
+          <h3 className="mt-3 text-5xl font-black text-orange-400">
+            {analysis.missing_skills}
+          </h3>
 
           <p className="mt-2 text-sm text-gray-500">Recommended Skills</p>
         </div>
@@ -139,7 +229,7 @@ export default function ResumeAnalysisPage() {
           <h3 className="text-2xl font-bold">Strengths</h3>
 
           <div className="mt-6 space-y-3">
-            {strengths.map((item) => (
+            {analysis.strengths?.map((item: string) => (
               <div
                 key={item}
                 className="
@@ -161,7 +251,7 @@ export default function ResumeAnalysisPage() {
           <h3 className="text-2xl font-bold">Improvement Areas</h3>
 
           <div className="mt-6 space-y-3">
-            {weaknesses.map((item) => (
+            {analysis.weaknesses?.map((item: string) => (
               <div
                 key={item}
                 className="
@@ -186,19 +276,19 @@ export default function ResumeAnalysisPage() {
         <h3 className="text-2xl font-bold">Recommended Skills</h3>
 
         <div className="mt-6 flex flex-wrap gap-3">
-          {missingSkills.map((skill) => (
+          {analysis.missing_skill_list?.map((skill: string) => (
             <span
               key={skill}
               className="
-                rounded-full
-                border
-                border-purple-500/20
-                bg-purple-500/10
-                px-4
-                py-2
-                text-sm
-                text-purple-300
-              "
+      rounded-full
+      border
+      border-purple-500/20
+      bg-purple-500/10
+      px-4
+      py-2
+      text-sm
+      text-purple-300
+    "
             >
               {skill}
             </span>
@@ -212,7 +302,7 @@ export default function ResumeAnalysisPage() {
         <h3 className="text-2xl font-bold">AI Recommendations</h3>
 
         <div className="mt-6 space-y-4">
-          {suggestions.map((item) => (
+          {analysis.recommendations?.map((item: string) => (
             <div
               key={item}
               className="

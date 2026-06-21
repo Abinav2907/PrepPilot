@@ -118,6 +118,49 @@ export default function ResumeUpload() {
 
       console.log("DB DATA:", dbData);
       console.log("DB ERROR:", dbError);
+      const response = await fetch("http://localhost:5000/api/resume/analyze", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          userId: user.id,
+          resumeUrl: fileUrl,
+        }),
+      });
+
+      const result = await response.json();
+
+      console.log("BACKEND RESULT:", result);
+
+      if (!result.success) {
+        throw new Error("Analysis failed");
+      }
+      const analysis = result.analysis;
+
+      const { error: analysisError } = await supabase
+        .from("resume_analysis")
+        .upsert(
+          {
+            user_id: user.id,
+
+            resume_score: analysis.resume_score,
+            ats_score: analysis.ats_score,
+            matched_skills: analysis.matched_skills,
+            missing_skills: analysis.missing_skills,
+
+            strengths: analysis.strengths,
+            weaknesses: analysis.weaknesses,
+            recommendations: analysis.recommendations,
+          },
+          {
+            onConflict: "user_id",
+          },
+        );
+
+      if (analysisError) {
+        throw analysisError;
+      }
 
       router.push("/main/resume-analysis");
     } catch (error: any) {

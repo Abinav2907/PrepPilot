@@ -24,11 +24,11 @@ export default function AuthCallback() {
         .select("*")
         .eq("id", user.id)
         .maybeSingle();
-
+      console.log("USER:", user);
       console.log("PROFILE:", profile);
       console.log("PROFILE ERROR:", error);
 
-      if (profile) {
+      if (profile?.full_name) {
         router.push("/main/dashboard");
       } else {
         router.push("/onboarding");

@@ -11,8 +11,16 @@ const cors = require("cors");
 
 const app = express();
 const authRoutes = require("./router/authRoutes");
-app.use(cors());
+const resumeRoutes = require("./router/resumeRoutes");
+app.use(
+  cors({
+    origin: "http://localhost:3000",
+    credentials: true,
+  }),
+);
 app.use(express.json());
+app.use("/api/resume", resumeRoutes);
+
 app.use("/api/auth", authRoutes);
 app.get("/", (req, res) => {
   res.send("Backend Running");

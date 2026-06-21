@@ -17,6 +17,9 @@ export default function LoginPage() {
       provider: "google",
       options: {
         redirectTo: "http://localhost:3000/auth/callback",
+        queryParams: {
+          prompt: "select_account",
+        },
       },
     });
 
