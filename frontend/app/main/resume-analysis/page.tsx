@@ -14,14 +14,20 @@ export default function ResumeAnalysisPage() {
     loadResume();
     loadAnalysis();
   }, []);
-
+  const handleDownload = async () => {
+    window.open(
+      `http://localhost:5000/api/resume/download/${resume.user_id}`,
+      "_blank",
+    );
+  };
   const loadResume = async () => {
     try {
       const {
         data: { user },
       } = await supabase.auth.getUser();
-
-      if (!user) return;
+      if (!user) {
+        return;
+      }
 
       const { data, error } = await supabase
         .from("resumes")
@@ -324,6 +330,7 @@ export default function ResumeAnalysisPage() {
 
       <div className="grid gap-4 md:grid-cols-2">
         <button
+          onClick={handleDownload}
           className="
             rounded-2xl
             border

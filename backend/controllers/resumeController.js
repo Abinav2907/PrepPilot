@@ -140,3 +140,86 @@ Rules:
     });
   }
 };
+const PDFDocument = require("pdfkit");
+
+exports.downloadReport = async (req, res) => {
+  try {
+    const { userId } = req.params;
+
+    const { data, error } = await supabase
+      .from("resume_analysis")
+      .select("*")
+      .eq("user_id", userId)
+      .single();
+
+    if (error || !data) {
+      return res.status(404).json({
+        success: false,
+        message: "Report not found",
+      });
+    }
+
+    const doc = new PDFDocument();
+
+    res.setHeader(
+      "Content-Disposition",
+      "attachment; filename=PrepPilot_Report.pdf",
+    );
+
+    res.setHeader("Content-Type", "application/pdf");
+
+    doc.pipe(res);
+
+    doc.fontSize(22).text("PrepPilot Resume Report", {
+      align: "center",
+    });
+
+    doc.moveDown();
+
+    doc.fontSize(16).text(`Resume Score: ${data.resume_score}`);
+    doc.text(`ATS Score: ${data.ats_score}`);
+    doc.text(`Matched Skills: ${data.matched_skills}`);
+    doc.text(`Missing Skills: ${data.missing_skills}`);
+
+    doc.moveDown();
+
+    doc.fontSize(18).text("Strengths");
+
+    data.strengths?.forEach((item) => {
+      doc.fontSize(12).text(`• ${item}`);
+    });
+
+    doc.moveDown();
+
+    doc.fontSize(18).text("Weaknesses");
+
+    data.weaknesses?.forEach((item) => {
+      doc.fontSize(12).text(`• ${item}`);
+    });
+
+    doc.moveDown();
+
+    doc.fontSize(18).text("Recommended Skills");
+
+    data.missing_skill_list?.forEach((item) => {
+      doc.fontSize(12).text(`• ${item}`);
+    });
+
+    doc.moveDown();
+
+    doc.fontSize(18).text("AI Recommendations");
+
+    data.recommendations?.forEach((item) => {
+      doc.fontSize(12).text(`• ${item}`);
+    });
+
+    doc.end();
+  } catch (err) {
+    console.log(err);
+
+    return res.status(500).json({
+      success: false,
+      message: "Failed to generate PDF",
+    });
+  }
+};
