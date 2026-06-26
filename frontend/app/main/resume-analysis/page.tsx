@@ -71,6 +71,19 @@ export default function ResumeAnalysisPage() {
       }
 
       setAnalysis(data);
+      localStorage.setItem(
+        "resumeResult",
+        JSON.stringify({
+          resume_score: data.resume_score,
+          ats_score: data.ats_score,
+          matched_skills: data.matched_skills,
+          missing_skills: data.missing_skills,
+          strengths: data.strengths,
+          weaknesses: data.weaknesses,
+          recommendations: data.recommendations,
+          missing_skill_list: data.missing_skill_list,
+        }),
+      );
     } catch (error) {
       console.log(error);
     }

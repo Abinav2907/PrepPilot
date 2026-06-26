@@ -1,72 +1,72 @@
 "use client";
 
 import { CheckCircle, Circle, PlayCircle, Target } from "lucide-react";
+import { useEffect, useState } from "react";
+import { roadmaps } from "./roadmaps";
 
 export default function RoadmapPage() {
-  const roadmap = [
-    {
-      title: "HTML Fundamentals",
-      status: "completed",
-      description: "Learn structure, forms, semantic tags and accessibility.",
-    },
-    {
-      title: "CSS & Responsive Design",
-      status: "completed",
-      description: "Flexbox, Grid, animations and responsive layouts.",
-    },
-    {
-      title: "JavaScript",
-      status: "completed",
-      description: "Core programming concepts and DOM manipulation.",
-    },
-    {
-      title: "React",
-      status: "completed",
-      description: "Components, hooks, routing and state management.",
-    },
-    {
-      title: "TypeScript",
-      status: "current",
-      description: "Types, interfaces, generics and React integration.",
-    },
-    {
-      title: "Next.js",
-      status: "upcoming",
-      description: "App Router, Server Components and deployment.",
-    },
-    {
-      title: "Node.js",
-      status: "upcoming",
-      description: "Backend APIs, Express and authentication.",
-    },
-    {
-      title: "MongoDB",
-      status: "upcoming",
-      description: "Database design, queries and optimization.",
-    },
-    {
-      title: "Docker",
-      status: "upcoming",
-      description: "Containers, images and deployment workflows.",
-    },
-    {
-      title: "AWS Cloud",
-      status: "upcoming",
-      description: "Cloud deployment and infrastructure basics.",
-    },
-    {
-      title: "System Design",
-      status: "upcoming",
-      description: "Scalable architecture and interview preparation.",
-    },
-  ];
+  const [roadmap, setRoadmap] = useState<any[]>([]);
 
   const completedCount = roadmap.filter(
     (item) => item.status === "completed",
   ).length;
 
-  const progress = Math.round((completedCount / roadmap.length) * 100);
+  const progress =
+    roadmap.length === 0
+      ? 0
+      : Math.round((completedCount / roadmap.length) * 100);
 
+  useEffect(() => {
+    const resume = JSON.parse(localStorage.getItem("resumeResult") || "{}");
+
+    // Change this later if you let users choose a role
+    const selectedRole = "Frontend";
+
+    const baseRoadmap = roadmaps[selectedRole as keyof typeof roadmaps] || [];
+
+    const missingSkills = resume.missing_skill_list || [];
+
+    const completedSkills = ["HTML", "CSS", "JavaScript", "React"];
+
+    let currentFound = false;
+
+    const roadmapData = baseRoadmap.map((skill) => {
+      if (completedSkills.includes(skill)) {
+        return {
+          title: skill,
+          status: "completed",
+          description: `Learn ${skill} to improve your profile.`,
+        };
+      }
+
+      if (!currentFound) {
+        currentFound = true;
+
+        return {
+          title: skill,
+          status: "current",
+          description: `Learn ${skill} to improve your profile.`,
+        };
+      }
+
+      return {
+        title: skill,
+        status: "upcoming",
+        description: `Learn ${skill} to improve your profile.`,
+      };
+    });
+
+    setRoadmap(roadmapData);
+    const completed = roadmapData.filter(
+      (item) => item.status === "completed",
+    ).length;
+
+    const progress = Math.round((completed / roadmapData.length) * 100);
+
+    setRoadmap(roadmapData);
+
+    localStorage.setItem("roadmap", JSON.stringify({ progress }));
+  }, []);
   return (
     <div className="space-y-8">
       {/* Hero */}
@@ -120,7 +120,8 @@ export default function RoadmapPage() {
             <h2 className="text-xl font-bold text-white">Current Focus</h2>
 
             <p className="mt-1 text-purple-300">
-              Master TypeScript and build production-ready Next.js applications.
+              {roadmap.find((item) => item.status === "current")?.title ||
+                "Complete your roadmap."}
             </p>
           </div>
         </div>
@@ -172,31 +173,19 @@ export default function RoadmapPage() {
       </div>
 
       {/* Recommendations */}
-      <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-6">
-        <h2 className="text-2xl font-bold text-white">AI Recommendations</h2>
-
-        <div className="mt-6 space-y-4">
-          {[
-            "Complete TypeScript before starting Next.js.",
-            "Build one full-stack project before Docker.",
-            "Practice DSA alongside roadmap progression.",
-            "Start mock interviews after Node.js.",
-          ].map((tip) => (
+      <div className="mt-6 space-y-4">
+        {roadmap
+          .filter((item) => item.status === "upcoming")
+          .slice(0, 4)
+          .map((item) => (
             <div
-              key={tip}
-              className="
-                rounded-2xl
-                border
-                border-cyan-500/20
-                bg-cyan-500/10
-                p-4
-                text-cyan-300
-              "
+              key={item.title}
+              className="rounded-2xl border border-cyan-500/20 bg-cyan-500/10 p-4 text-cyan-300"
             >
-              💡 {tip}
+              💡 Learn <strong>{item.title}</strong> to improve your resume and
+              career readiness.
             </div>
           ))}
-        </div>
       </div>
     </div>
   );

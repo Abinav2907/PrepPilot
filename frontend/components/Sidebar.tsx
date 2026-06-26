@@ -79,7 +79,7 @@ border-white/10
       <div className="px-8 pt-8 pb-7 border-b border-white/10">
         <h1
           className="
-            text-[58px]
+            text-[50px]
             leading-none
             font-black
             tracking-tight
