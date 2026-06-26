@@ -164,7 +164,10 @@ export default function InterviewPage() {
             return (
               <button
                 key={category.name}
-                onClick={() => setSelectedCategory(category.name)}
+                onClick={() => {
+                  setSelectedCategory(category.name);
+                  setJobRole(category.name);
+                }}
                 className={`rounded-2xl border p-5 transition-all duration-300 ${
                   selectedCategory === category.name
                     ? "border-cyan-500 bg-cyan-500/10 scale-105"
@@ -213,19 +216,18 @@ export default function InterviewPage() {
           <div>
             <label className="mb-2 block text-gray-300">Job Role</label>
 
-            <input
-              type="text"
-              placeholder="Frontend Developer"
-              value={jobRole}
-              onChange={(e) => setJobRole(e.target.value)}
-              className="w-full rounded-2xl border border-white/10 bg-[#111827] px-4 py-4 text-white outline-none focus:border-cyan-500"
-            />
+            <div className="w-full rounded-2xl border border-cyan-500/20 bg-cyan-500/10 px-5 py-4 text-lg font-semibold text-cyan-300">
+              {jobRole}
+            </div>
           </div>
 
           <div>
-            <label className="mb-2 block text-gray-300">Experience</label>
+            <label htmlFor="experience" className="mb-2 block text-gray-300">
+              Experience
+            </label>
 
             <select
+              id="experience"
               value={experience}
               onChange={(e) => setExperience(e.target.value)}
               className="w-full rounded-2xl border border-white/10 bg-[#111827] px-4 py-4 text-white outline-none focus:border-cyan-500"
@@ -240,7 +242,7 @@ export default function InterviewPage() {
       </div>
       {/* Skills */}
 
-      <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-6">
+      <div className="rounded-3xl border border-white/10 bg-white/3 p-6">
         <div className="flex items-center justify-between">
           <h2 className="text-2xl font-bold text-white">Select Skills</h2>
 
@@ -264,8 +266,8 @@ export default function InterviewPage() {
                 onClick={() => toggleSkill(skill)}
                 className={`rounded-full px-5 py-3 font-medium transition-all duration-300 ${
                   selected
-                    ? "bg-gradient-to-r from-purple-600 to-cyan-500 text-white shadow-lg"
-                    : "border border-white/10 bg-white/[0.03] text-gray-300 hover:border-cyan-400 hover:text-white"
+                    ? "bg-linear-to-r from-purple-600 to-cyan-500 text-white shadow-lg"
+                    : "border border-white/10 bg-white/3 text-gray-300 hover:border-cyan-400 hover:text-white"
                 }`}
               >
                 {skill}
@@ -277,7 +279,7 @@ export default function InterviewPage() {
 
       {/* Selected Skills */}
 
-      <div className="rounded-3xl border border-white/10 bg-white/[0.03] p-6">
+      <div className="rounded-3xl border border-white/10 bg-white/3 p-6">
         <h2 className="text-xl font-bold text-white">Selected Skills</h2>
 
         {selectedSkills.length === 0 ? (
@@ -298,7 +300,7 @@ export default function InterviewPage() {
 
       {/* Start Interview */}
 
-      <div className="rounded-3xl border border-white/10 bg-gradient-to-r from-purple-600/10 to-cyan-500/10 p-8 text-center">
+      <div className="rounded-3xl border border-white/10 bg-linear-to-r from-purple-600/10 to-cyan-500/10 p-8 text-center">
         <h2 className="text-3xl font-black text-white">Ready To Start?</h2>
 
         <p className="mt-3 text-gray-400">
@@ -308,7 +310,7 @@ export default function InterviewPage() {
 
         <button
           onClick={handleStartInterview}
-          className="mt-8 inline-flex items-center gap-3 rounded-2xl bg-gradient-to-r from-purple-600 to-cyan-500 px-8 py-4 font-semibold text-white transition hover:scale-105"
+          className="mt-8 inline-flex items-center gap-3 rounded-2xl bg-linear-to-r from-purple-600 to-cyan-500 px-8 py-4 font-semibold text-white transition hover:scale-105"
         >
           <Play size={22} />
           Start AI Interview
