@@ -1,39 +1,73 @@
 "use client";
 
 import { useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
+import jsPDF from "jspdf";
+import autoTable from "jspdf-autotable";
+interface InterviewResult {
+  overallScore: number;
+  technical: number;
+  communication: number;
+  confidence: number;
+  strengths: string[];
+  weaknesses: string[];
+  feedback: string[];
+}
 
 export default function InterviewAnalysisPage() {
   const router = useRouter();
 
-  const interviewData = {
-    overallScore: 84,
-    technicalScore: 88,
-    communicationScore: 79,
-    confidenceScore: 85,
+  const [interviewData, setInterviewData] = useState<InterviewResult | null>(
+    null,
+  );
+  const downloadReport = () => {
+    if (!interviewData) return;
 
-    strengths: [
-      "Strong React fundamentals",
-      "Good problem-solving approach",
-      "Clear technical explanations",
-      "Confident responses",
-    ],
+    const doc = new jsPDF();
 
-    weaknesses: [
-      "Need deeper system design knowledge",
-      "Improve database optimization concepts",
-      "Reduce filler words while speaking",
-      "Provide more real-world examples",
-    ],
+    doc.setFontSize(22);
+    doc.text("PrepPilot AI Interview Report", 14, 20);
 
-    recommendations: [
-      "Practice advanced React interview questions",
-      "Learn system design fundamentals",
-      "Improve communication clarity",
-      "Study MongoDB indexing",
-      "Mock interview practice twice weekly",
-    ],
+    doc.setFontSize(12);
+    doc.text(`Overall Score: ${interviewData.overallScore}`, 14, 35);
+    doc.text(`Technical Score: ${interviewData.technical}`, 14, 45);
+    doc.text(`Communication Score: ${interviewData.communication}`, 14, 55);
+    doc.text(`Confidence Score: ${interviewData.confidence}`, 14, 65);
+
+    autoTable(doc, {
+      startY: 80,
+      head: [["Strengths"]],
+      body: interviewData.strengths.map((item) => [item]),
+    });
+
+    autoTable(doc, {
+      startY: (doc as any).lastAutoTable.finalY + 10,
+      head: [["Weaknesses"]],
+      body: interviewData.weaknesses.map((item) => [item]),
+    });
+
+    autoTable(doc, {
+      startY: (doc as any).lastAutoTable.finalY + 10,
+      head: [["AI Feedback"]],
+      body: interviewData.feedback.map((item) => [item]),
+    });
+
+    doc.save("PrepPilot_Interview_Report.pdf");
   };
+  useEffect(() => {
+    const stored = localStorage.getItem("interviewResult");
 
+    if (stored) {
+      setInterviewData(JSON.parse(stored) as InterviewResult);
+    }
+  }, []);
+  if (!interviewData) {
+    return (
+      <div className="flex min-h-[60vh] items-center justify-center text-white text-xl">
+        Loading Interview Result...
+      </div>
+    );
+  }
   return (
     <div className="space-y-8">
       {/* Header */}
@@ -87,7 +121,7 @@ export default function InterviewAnalysisPage() {
           <p className="text-gray-400">Technical</p>
 
           <h2 className="mt-4 text-6xl font-black text-cyan-400">
-            {interviewData.technicalScore}
+            {interviewData.technical}
           </h2>
 
           <p className="mt-2 text-gray-500">Technical Knowledge</p>
@@ -97,7 +131,7 @@ export default function InterviewAnalysisPage() {
           <p className="text-gray-400">Communication</p>
 
           <h2 className="mt-4 text-6xl font-black text-green-400">
-            {interviewData.communicationScore}
+            {interviewData.communication}
           </h2>
 
           <p className="mt-2 text-gray-500">Communication Skills</p>
@@ -107,7 +141,7 @@ export default function InterviewAnalysisPage() {
           <p className="text-gray-400">Confidence</p>
 
           <h2 className="mt-4 text-6xl font-black text-orange-400">
-            {interviewData.confidenceScore}
+            {interviewData.confidence}
           </h2>
 
           <p className="mt-2 text-gray-500">Confidence Level</p>
@@ -166,7 +200,7 @@ export default function InterviewAnalysisPage() {
         <h3 className="text-2xl font-bold text-white">AI Recommendations</h3>
 
         <div className="mt-6 space-y-4">
-          {interviewData.recommendations.map((item) => (
+          {(interviewData.feedback || []).map((item) => (
             <div
               key={item}
               className="
@@ -189,27 +223,27 @@ export default function InterviewAnalysisPage() {
         <h3 className="text-2xl font-bold text-white">Performance Summary</h3>
 
         <p className="mt-5 leading-8 text-gray-300">
-          You performed well in the technical section and demonstrated strong
-          React knowledge. Communication was good overall, but you can improve
-          by providing more structured answers and reducing filler words. Focus
-          on system design, backend architecture, and real-world project
-          discussions to improve your interview success rate.
+          Overall Score: {interviewData.overallScore}/100. Your technical score
+          is {interviewData.technical}, communication score is{" "}
+          {interviewData.communication}, and confidence score is{" "}
+          {interviewData.confidence}.
         </p>
       </div>
 
       {/* Bottom Buttons */}
       <div className="grid gap-4 md:grid-cols-2">
         <button
+          onClick={downloadReport}
           className="
-            rounded-2xl
-            border
-            border-white/10
-            bg-white/[0.03]
-            p-4
-            font-semibold
-            transition
-            hover:bg-white/10
-          "
+    rounded-2xl
+    border
+    border-white/10
+    bg-white/[0.03]
+    p-4
+    font-semibold
+    transition
+    hover:bg-white/10
+  "
         >
           📥 Download Report
         </button>
