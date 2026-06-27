@@ -51,7 +51,7 @@ export default function InterviewSession() {
     const recognition = new SpeechRecognition();
 
     recognition.continuous = true;
-    recognition.interimResults = true;
+    recognition.interimResults = false; // Disable interim results to prevent duplicate speech tokens on mobile browsers
     recognition.lang = "en-US";
 
     recognition.onresult = (event: any) => {
@@ -61,9 +61,11 @@ export default function InterviewSession() {
         transcript += event.results[i][0].transcript;
       }
 
-      const updated = [...answers];
-      updated[currentQuestion] = transcript;
-      setAnswers(updated);
+      setAnswers((prev) => {
+        const updated = [...prev];
+        updated[currentQuestion] = transcript;
+        return updated;
+      });
     };
 
     recognition.onend = () => {
@@ -71,7 +73,20 @@ export default function InterviewSession() {
     };
 
     recognitionRef.current = recognition;
-  }, [currentQuestion, answers]);
+
+    // Cleanup: ensure the recognition instance is stopped and handlers cleared when question changes or unmounts
+    return () => {
+      if (recognition) {
+        recognition.onresult = null;
+        recognition.onend = null;
+        try {
+          recognition.stop();
+        } catch (err) {
+          // Ignore errors from stopping already-stopped instances
+        }
+      }
+    };
+  }, [currentQuestion]);
 
   const minutes = Math.floor(timeLeft / 60);
   const seconds = timeLeft % 60;

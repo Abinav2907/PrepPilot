@@ -131,19 +131,48 @@ Rules:
     const analysis = JSON.parse(cleaned);
     console.log("FULL ANALYSIS:", JSON.stringify(analysis, null, 2));
 
+    // Convert scores to integers out of 100 to prevent Postgres invalid input syntax errors
+    let resumeScore = parseFloat(analysis.resume_score);
+    let atsScore = parseFloat(analysis.ats_score);
+
+    // If the model returned a float between 0 and 1 (e.g. 0.85), scale it to 100 (e.g. 85)
+    if (resumeScore <= 1.0 && resumeScore > 0) {
+      resumeScore = Math.round(resumeScore * 100);
+    } else {
+      resumeScore = Math.round(resumeScore) || 80;
+    }
+
+    if (atsScore <= 1.0 && atsScore > 0) {
+      atsScore = Math.round(atsScore * 100);
+    } else {
+      atsScore = Math.round(atsScore) || 80;
+    }
+
+    resumeScore = Math.max(0, Math.min(100, resumeScore));
+    atsScore = Math.max(0, Math.min(100, atsScore));
+
+    const matchedSkills = Math.round(parseFloat(analysis.matched_skills)) || 0;
+    const missingSkills = Math.round(parseFloat(analysis.missing_skills)) || 0;
+
+    // Update analysis object with normalized values
+    analysis.resume_score = resumeScore;
+    analysis.ats_score = atsScore;
+    analysis.matched_skills = matchedSkills;
+    analysis.missing_skills = missingSkills;
+
     const { data, error } = await supabase
       .from("resume_analysis")
       .upsert(
         {
           user_id: userId,
-          resume_score: analysis.resume_score,
-          ats_score: analysis.ats_score,
-          matched_skills: analysis.matched_skills,
-          missing_skills: analysis.missing_skills,
-          missing_skill_list: analysis.missing_skill_list,
-          strengths: analysis.strengths,
-          weaknesses: analysis.weaknesses,
-          recommendations: analysis.recommendations,
+          resume_score: resumeScore,
+          ats_score: atsScore,
+          matched_skills: matchedSkills,
+          missing_skills: missingSkills,
+          missing_skill_list: analysis.missing_skill_list || [],
+          strengths: analysis.strengths || [],
+          weaknesses: analysis.weaknesses || [],
+          recommendations: analysis.recommendations || [],
         },
         { onConflict: "user_id" },
       )
