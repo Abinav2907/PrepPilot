@@ -4,6 +4,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import jsPDF from "jspdf";
 import autoTable from "jspdf-autotable";
+import { supabase } from "@/lib/supabase";
 interface InterviewResult {
   overallScore: number;
   technical: number;
@@ -54,17 +55,92 @@ export default function InterviewAnalysisPage() {
 
     doc.save("PrepPilot_Interview_Report.pdf");
   };
-  useEffect(() => {
-    const stored = localStorage.getItem("interviewResult");
+  const [loading, setLoading] = useState(true);
 
-    if (stored) {
-      setInterviewData(JSON.parse(stored) as InterviewResult);
-    }
+  useEffect(() => {
+    const loadInterview = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
+
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+
+      const { data, error } = await supabase
+        .from("interview_analysis")
+        .select("*")
+        .eq("user_id", user.id)
+        .single();
+      console.log("Logged in user:", user.id);
+      console.log("Supabase data:", data);
+      console.log("Supabase error:", error);
+      if (!error && data) {
+        setInterviewData({
+          overallScore: data.overall_score,
+          technical: data.technical,
+          communication: data.communication,
+          confidence: data.confidence,
+          strengths: data.strengths || [],
+          weaknesses: data.weaknesses || [],
+          feedback: data.feedback || [],
+        });
+      }
+
+      setLoading(false);
+    };
+
+    loadInterview();
   }, []);
+  if (loading) {
+    return (
+      <div className="flex h-[70vh] items-center justify-center">
+        <div className="h-10 w-10 animate-spin rounded-full border-4 border-cyan-500 border-t-transparent" />
+      </div>
+    );
+  }
+
   if (!interviewData) {
     return (
-      <div className="flex min-h-[60vh] items-center justify-center text-white text-xl">
-        Loading Interview Result...
+      <div className="flex min-h-[75vh] items-center justify-center">
+        <div className="w-full max-w-2xl rounded-3xl border border-white/10 bg-white/[0.03] p-12 text-center backdrop-blur-xl">
+          <div className="mx-auto mb-8 flex h-24 w-24 items-center justify-center rounded-full bg-gradient-to-r from-purple-600/20 to-cyan-500/20 text-5xl">
+            🎤
+          </div>
+
+          <h1 className="text-4xl font-black text-white">
+            No Interview Taken Yet
+          </h1>
+
+          <p className="mt-5 text-lg leading-8 text-gray-400">
+            You haven't completed an AI interview yet.
+            <br />
+            Take your first interview to receive a detailed performance
+            analysis, personalized feedback, strengths, weaknesses, and
+            improvement recommendations.
+          </p>
+
+          <button
+            onClick={() => router.push("/main/interview")}
+            className="
+              mt-10
+              rounded-2xl
+              bg-gradient-to-r
+              from-purple-600
+              to-cyan-500
+              px-10
+              py-4
+              text-lg
+              font-bold
+              text-white
+              transition
+              hover:scale-105
+            "
+          >
+            🚀 Start Your First Interview
+          </button>
+        </div>
       </div>
     );
   }

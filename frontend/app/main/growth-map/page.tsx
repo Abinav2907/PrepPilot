@@ -2,7 +2,7 @@
 
 import { TrendingUp, FileText, Mic, Target, Award } from "lucide-react";
 import { useEffect, useState } from "react";
-
+import { supabase } from "@/lib/supabase";
 export default function GrowthTrackerPage() {
   const [growthScore, setGrowthScore] = useState(0);
   const [resumeScore, setResumeScore] = useState(0);
@@ -17,127 +17,122 @@ export default function GrowthTrackerPage() {
   const [insights, setInsights] = useState<string[]>([]);
 
   useEffect(() => {
-    // -------------------------
-    // Resume Result
-    // -------------------------
+    const loadData = async () => {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
 
-    const resume = JSON.parse(localStorage.getItem("resumeResult") || "{}");
+      if (!user) return;
 
-    console.log("Resume Result:", resume);
-    // -------------------------
-    // Interview Result
-    // -------------------------
+      // ---------------- Resume ----------------
 
-    const interview = JSON.parse(
-      localStorage.getItem("interviewResult") || "{}",
-    );
+      const { data: resume } = await supabase
+        .from("resume_analysis")
+        .select("*")
+        .eq("user_id", user.id)
+        .single();
 
-    // -------------------------
-    // Roadmap (Future)
-    // -------------------------
+      // ---------------- Interview ----------------
 
-    const roadmap = JSON.parse(localStorage.getItem("roadmap") || "{}");
+      const { data: interview } = await supabase
+        .from("interview_analysis")
+        .select("*")
+        .eq("user_id", user.id)
+        .single();
 
-    // -------------------------
-    // Resume Score
-    // -------------------------
+      // ---------------- Resume Score ----------------
 
-    setResumeScore(resume.resume_score ?? 0);
+      console.log("Resume Data:", resume);
 
-    // -------------------------
-    // Interview Score
-    // -------------------------
+      const resumeScore =
+        resume?.resume_score ?? resume?.ats_score ?? resume?.overall_score ?? 0;
 
-    setInterviewScore(interview.overallScore || 0);
+      setResumeScore(resumeScore);
 
-    // -------------------------
-    // Roadmap Progress
-    // -------------------------
+      // ---------------- Interview Score ----------------
 
-    setRoadmapProgress(roadmap.progress || 0);
+      const interviewScore = interview?.overall_score || 0;
+      setInterviewScore(interviewScore);
 
-    // -------------------------
-    // Growth Score
-    // -------------------------
+      // ---------------- Roadmap ----------------
 
-    const overall = Math.round(
-      ((resume.resume_score || 0) + (interview.overallScore || 0)) / 2,
-    );
+      setRoadmapProgress(0);
 
-    setGrowthScore(overall);
+      // ---------------- Growth Score ----------------
 
-    // -------------------------
-    // Skill Growth
-    // -------------------------
+      const overall = Math.round((resumeScore + interviewScore) / 2);
 
-    const totalSkills =
-      (resume.matched_skills || 0) + (resume.missing_skills || 0);
+      setGrowthScore(overall);
 
-    const skillPercentage =
-      totalSkills > 0
-        ? Math.round((resume.matched_skills / totalSkills) * 100)
-        : 0;
+      // ---------------- Skill Match ----------------
 
-    setSkillGrowth(skillPercentage);
+      const matchedSkills = resume?.matched_skills?.length || 0;
+      const missingSkills = resume?.missing_skills?.length || 0;
 
-    // -------------------------
-    // Skills
-    // -------------------------
+      const totalSkills = matchedSkills + missingSkills;
 
-    const generatedSkills = [];
+      const skillPercentage =
+        totalSkills > 0 ? Math.round((matchedSkills / totalSkills) * 100) : 0;
 
-    if (resume.matched_skills > 0) {
-      generatedSkills.push({
-        name: "Skill Match",
-        progress: skillPercentage,
-      });
-    }
+      setSkillGrowth(skillPercentage);
 
-    if (resume.ats_score) {
-      generatedSkills.push({
-        name: "ATS Compatibility",
-        progress: resume.ats_score,
-      });
-    }
+      // ---------------- Skills ----------------
 
-    if (interview.technical) {
-      generatedSkills.push({
-        name: "Technical Knowledge",
-        progress: interview.technical,
-      });
-    }
+      const generatedSkills = [];
 
-    if (interview.communication) {
-      generatedSkills.push({
-        name: "Communication",
-        progress: interview.communication,
-      });
-    }
+      if (matchedSkills > 0)
+        generatedSkills.push({
+          name: "Skill Match",
+          progress: skillPercentage,
+        });
 
-    if (interview.confidence) {
-      generatedSkills.push({
-        name: "Confidence",
-        progress: interview.confidence,
-      });
-    }
+      if (resume?.ats_score)
+        generatedSkills.push({
+          name: "ATS Compatibility",
+          progress: resume.ats_score,
+        });
 
-    setSkills(generatedSkills);
+      if (interview?.technical)
+        generatedSkills.push({
+          name: "Technical Knowledge",
+          progress: interview.technical,
+        });
 
-    // -------------------------
-    // AI Insights
-    // -------------------------
+      if (interview?.communication)
+        generatedSkills.push({
+          name: "Communication",
+          progress: interview.communication,
+        });
 
-    const aiInsights = [];
+      if (interview?.confidence)
+        generatedSkills.push({
+          name: "Confidence",
+          progress: interview.confidence,
+        });
 
-    if (interview.feedback) {
-      aiInsights.push(...interview.feedback);
-    }
+      setSkills(generatedSkills);
 
-    if (resume.recommendations) {
-      aiInsights.push(...resume.recommendations);
-    }
+      // ---------------- AI Insights ----------------
 
-    setInsights(aiInsights);
+      const aiInsights: string[] = [];
+
+      if (interview?.feedback?.length) {
+        aiInsights.push(...interview.feedback);
+      }
+
+      if (resume?.recommendations?.length) {
+        aiInsights.push(...resume.recommendations);
+      }
+      console.log("Resume:", resume);
+      console.log("Interview:", interview);
+      console.log("Resume Score:", resumeScore);
+      console.log("Interview Score:", interviewScore);
+      console.log("Skill %:", skillPercentage);
+
+      setInsights(aiInsights);
+    };
+
+    loadData();
   }, []);
 
   let achievement = {

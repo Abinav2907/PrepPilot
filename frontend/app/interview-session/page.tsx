@@ -141,32 +141,25 @@ export default function InterviewSession() {
       console.log("Backend Response Data:", data);
 
       // Save to localStorage using standard camelCase naming conventions
-      localStorage.setItem(
-        "interviewResult",
-        JSON.stringify({
-          overallScore: data.overallScore ?? 0,
-          technical: data.technical ?? 0,
-          communication: data.communication ?? 0,
-          confidence: data.confidence ?? 0,
-          strengths: data.strengths || [],
-          weaknesses: data.weaknesses || [],
-          feedback: data.feedback || [],
-        }),
-      );
 
       // Map cleanly to snake_case columns for the Supabase insertion
       const { data: savedData, error: dbError } = await supabase
         .from("interview_analysis")
-        .upsert({
-          user_id: user.id,
-          overall_score: data.overallScore ?? 0,
-          technical: data.technical ?? 0,
-          communication: data.communication ?? 0,
-          confidence: data.confidence ?? 0,
-          strengths: data.strengths || [],
-          weaknesses: data.weaknesses || [],
-          feedback: data.feedback || [],
-        })
+        .upsert(
+          {
+            user_id: user.id,
+            overall_score: data.overallScore,
+            technical: data.technical,
+            communication: data.communication,
+            confidence: data.confidence,
+            strengths: data.strengths,
+            weaknesses: data.weaknesses,
+            feedback: data.feedback,
+          },
+          {
+            onConflict: "user_id",
+          },
+        )
         .select();
 
       if (dbError) {
