@@ -134,7 +134,7 @@ export default function ResumeUpload() {
       console.log("BACKEND RESULT:", result);
 
       if (!result.success) {
-        throw new Error("Analysis failed");
+        throw new Error(result.message || "Analysis failed");
       }
       const analysis = result.analysis;
 

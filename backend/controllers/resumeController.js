@@ -78,6 +78,10 @@ exports.analyzeResume = async (req, res) => {
       pdfBuffer = Buffer.from(pdfResponse.data);
     }
 
+    if (!pdfBuffer || pdfBuffer.length === 0) {
+      throw new Error("Unable to download resume file from storage. Please verify the backend SUPABASE_SERVICE_ROLE_KEY is set to the Service Role Key (not the Anon Key) in your Render settings.");
+    }
+
     console.log("PDF SIZE:", pdfBuffer.length);
 
     const pdfBase64 = pdfBuffer.toString("base64");
@@ -147,17 +151,17 @@ Rules:
 
     if (error) {
       console.log("SUPABASE ERROR:", error);
-      throw error;
+      throw new Error(`Database error saving analysis: ${error.message}`);
     }
 
     console.log("SAVED DATA:", data);
 
     return res.status(200).json({ success: true, analysis });
   } catch (error) {
-    console.log("ERROR:", error);
+    console.error("ANALYSIS ERROR:", error);
     return res.status(500).json({
       success: false,
-      message: "Analysis failed",
+      message: error.message || "Analysis failed",
       error: error.message,
     });
   }
