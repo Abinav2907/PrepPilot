@@ -59,6 +59,23 @@ exports.analyzeResume = async (req, res) => {
     console.log("USER:", userId);
     console.log("RESUME URL:", resumeUrl);
 
+    // Fetch user profile to tailor analysis
+    let profile = null;
+    try {
+      const { data: profileData } = await supabase
+        .from("profiles")
+        .select("*")
+        .eq("id", userId)
+        .maybeSingle();
+      profile = profileData;
+      console.log("Tailoring resume analysis for profile:", profile);
+    } catch (profileErr) {
+      console.warn("⚠️ Failed to fetch profile for resume analysis:", profileErr.message);
+    }
+
+    const targetRole = profile?.target_role || "Software Developer";
+    const experienceLevel = profile?.degree || "Intermediate";
+
     let pdfBuffer;
 
     try {
@@ -87,37 +104,37 @@ exports.analyzeResume = async (req, res) => {
     const pdfBase64 = pdfBuffer.toString("base64");
 
     const prompt = `
-Analyze this resume thoroughly.
+You are a senior technical recruiter and professional resume writer.
+Analyze this candidate's resume for the role of: "${targetRole}" (${experienceLevel} level).
 
-Evaluate:
-1. Resume quality
-2. ATS compatibility
-3. Technical skills
-4. Projects
-5. Experience
-6. Certifications
-7. Education
+Strictly evaluate the resume against standard market requirements for "${targetRole}" and the candidate's actual qualifications.
 
-Return ONLY valid JSON:
+Evaluation Metrics:
+1. ATS Compatibility (Format, section headers, readability, and keyword match for "${targetRole}").
+2. Core Technical Skills (Does the resume list relevant skills for "${targetRole}"? How many are matched vs. missing?).
+3. Strengths (At least 2-3 specific, detailed professional highlights from the resume content).
+4. Weaknesses (At least 2-3 specific gaps relative to the "${targetRole}" role, like missing skills or lack of projects/metrics).
+5. Recommendations (Clear, actionable improvements for their resume, project section, or skills).
+
+Special Rules:
+- If the resume is empty, contains nonsense, or is extremely short/blank, you MUST score both resume_score and ats_score very low (e.g., between 5 and 30) and list "Missing resume content" or "Invalid format" as a major weakness.
+- Generate realistic scores out of 100 based on actual content matching. Do not use fixed template values.
+- Do NOT use generic template placeholders.
+- missing_skill_list must contain actual missing technical skills needed for "${targetRole}" that are not present in the resume.
+- Return at least 3 skills whenever possible.
+- Do not leave missing_skill_list empty.
+
+Return ONLY a valid JSON object matching this schema:
 {
   "resume_score": number,
   "ats_score": number,
   "matched_skills": number,
   "missing_skills": number,
   "missing_skill_list": ["Docker", "AWS", "Git", "MongoDB"],
-  "strengths": [],
-  "weaknesses": [],
-  "recommendations": []
+  "strengths": ["string"],
+  "weaknesses": ["string"],
+  "recommendations": ["string"]
 }
-
-Rules:
-- Generate realistic scores.
-- Do not use fixed values.
-- Score based on actual resume content.
-- Return only JSON.
-- missing_skill_list must contain actual missing technical skills.
-- Return at least 3 skills whenever possible.
-- Do not leave missing_skill_list empty.
 `;
 
     const aiResponse = await callAI(prompt, pdfBase64, pdfBuffer);
