@@ -8,9 +8,24 @@ const pdfParse = require("pdf-parse");
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-// Gemini first (PDF support), Groq fallback (text only)
-async function callAI(prompt, pdfBase64 = null, pdfBuffer = null) {
+// Groq primary (no daily rate limits), Gemini fallback (PDF native support)
+async function callAI(prompt, pdfBase64 = null) {
+  // ── Primary: Groq ──────────────────────────────────────────────────
   try {
+    const groqResponse = await groq.chat.completions.create({
+      model: "llama-3.3-70b-versatile",
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.2, // Low temperature = deterministic, content-based scoring
+      max_tokens: 1024,
+    });
+
+    console.log("✅ Used: Groq (Llama 3.3 70B)");
+    return groqResponse.choices[0].message.content;
+  } catch (groqErr) {
+    console.warn("⚠️ Groq failed:", groqErr.message);
+    console.log("🔄 Switching to Gemini 2.5 Flash as fallback...");
+
+    // ── Fallback: Gemini (native PDF support) ───────────────────────
     const contents = pdfBase64
       ? [
           { inlineData: { mimeType: "application/pdf", data: pdfBase64 } },
@@ -25,29 +40,6 @@ async function callAI(prompt, pdfBase64 = null, pdfBuffer = null) {
 
     console.log("✅ Used: Gemini 2.5 Flash");
     return response.text;
-  } catch (geminiErr) {
-    console.warn("⚠️ Gemini failed:", geminiErr.message);
-    console.log("🔄 Switching to Groq (Llama 3.3 70B)...");
-
-    let textPrompt = prompt;
-    if (pdfBuffer) {
-      try {
-        const parsed = await pdfParse(pdfBuffer);
-        textPrompt = `${prompt}\n\nHere is the resume content extracted from PDF:\n${parsed.text}`;
-        console.log("📄 Successfully parsed PDF text for Groq fallback.");
-      } catch (parseErr) {
-        console.error("❌ Failed to parse PDF text:", parseErr.message);
-      }
-    }
-
-    const groqResponse = await groq.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
-      messages: [{ role: "user", content: textPrompt }],
-      temperature: 0.7,
-    });
-
-    console.log("✅ Used: Groq (Llama 3.3 70B)");
-    return groqResponse.choices[0].message.content;
   }
 }
 
@@ -137,7 +129,27 @@ Return ONLY a valid JSON object matching this schema:
 }
 `;
 
-    const aiResponse = await callAI(prompt, pdfBase64, pdfBuffer);
+    // Extract text from PDF upfront so Groq can read actual resume content
+    let extractedText = "";
+    try {
+      const parsed = await pdfParse(pdfBuffer);
+      extractedText = parsed.text.trim();
+      console.log("📄 PDF text extracted, length:", extractedText.length, "chars");
+    } catch (parseErr) {
+      console.error("❌ pdf-parse failed:", parseErr.message);
+    }
+
+    // Build the full prompt for Groq with clearly demarcated resume text
+    let fullPrompt;
+    if (extractedText.length > 80) {
+      fullPrompt = `${prompt}\n\n=== RESUME CONTENT START ===\n${extractedText}\n=== RESUME CONTENT END ===`;
+    } else {
+      // Resume text is empty or unreadable — instruct model to score very low
+      console.warn("⚠️ Extracted resume text is empty or too short — scoring as empty resume");
+      fullPrompt = `${prompt}\n\n[RESUME IS BLANK OR UNREADABLE. Score resume_score and ats_score between 5 and 20 and list 'Empty or unreadable resume' as the primary weakness.]`;
+    }
+
+    const aiResponse = await callAI(fullPrompt, pdfBase64);
     console.log("AI RESPONSE:", aiResponse);
 
     const cleaned = aiResponse
