@@ -173,7 +173,7 @@ export default function ResumeAnalysisPage() {
       </div>
       {/* SCORE CARDS */}
 
-      <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid gap-6 sm:grid-cols-2 xl:grid-3">
         <div className="rounded-3xl border border-purple-500/20 bg-purple-500/10 p-6">
           <p className="text-gray-400">Resume Score</p>
 

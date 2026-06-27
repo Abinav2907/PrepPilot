@@ -66,8 +66,13 @@ export default function GrowthTrackerPage() {
 
       // ---------------- Skill Match ----------------
 
-      const matchedSkills = resume?.matched_skills?.length || 0;
-      const missingSkills = resume?.missing_skills?.length || 0;
+      const matchedSkills = Array.isArray(resume?.matched_skills)
+        ? resume.matched_skills.length
+        : resume?.matched_skills || 0;
+
+      const missingSkills = Array.isArray(resume?.missing_skills)
+        ? resume.missing_skills.length
+        : resume?.missing_skills || 0;
 
       const totalSkills = matchedSkills + missingSkills;
 
@@ -202,7 +207,7 @@ export default function GrowthTrackerPage() {
       </div>
 
       {/* Progress Cards */}
-      <div className="grid gap-6 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-6 md:grid-cols-3">
         {[
           {
             title: "Resume Progress",
@@ -216,12 +221,7 @@ export default function GrowthTrackerPage() {
             icon: Mic,
             color: "text-cyan-400",
           },
-          {
-            title: "Roadmap Progress",
-            value: `${roadmapProgress}%`,
-            icon: Target,
-            color: "text-green-400",
-          },
+
           {
             title: "Skill Match",
             value: `${skillGrowth}%`,
@@ -321,11 +321,7 @@ export default function GrowthTrackerPage() {
               value: interviewScore,
               color: "from-cyan-500 to-blue-500",
             },
-            {
-              label: "Roadmap",
-              value: roadmapProgress,
-              color: "from-green-500 to-emerald-500",
-            },
+
             {
               label: "Skills",
               value: skillGrowth,

@@ -40,11 +40,6 @@ const navItems = [
     href: "/main/growth-map",
     icon: TrendingUp,
   },
-  {
-    label: "Roadmap",
-    href: "/main/roadmap",
-    icon: Map,
-  },
 ];
 
 export default function Sidebar() {
