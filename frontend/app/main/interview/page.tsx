@@ -78,7 +78,7 @@ export default function InterviewPage() {
       }
 
       const response = await fetch(
-        "http://localhost:5000/api/interview/generate",
+        `${process.env.NEXT_PUBLIC_API_URL}/api/interview/generate`,
         {
           method: "POST",
           headers: {

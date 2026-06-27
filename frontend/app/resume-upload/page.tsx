@@ -118,7 +118,7 @@ export default function ResumeUpload() {
 
       console.log("DB DATA:", dbData);
       console.log("DB ERROR:", dbError);
-      const response = await fetch("http://localhost:5000/api/resume/analyze", {
+      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/resume/analyze`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",

@@ -11,7 +11,7 @@ export default function ResumeAnalysisPage() {
 
   const handleDownload = async () => {
     window.open(
-      `http://localhost:5000/api/resume/download/${resume.user_id}`,
+      `${process.env.NEXT_PUBLIC_API_URL}/api/resume/download/${resume.user_id}`,
       "_blank",
     );
   };
