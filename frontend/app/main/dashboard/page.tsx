@@ -371,7 +371,7 @@ export default function DashboardPage() {
             <h2 className="text-2xl font-bold text-white">Quick Actions</h2>
             <div className="mt-6 space-y-3">
               <button
-                onClick={() => router.push("/main/resume-upload")}
+                onClick={() => router.push("/resume-upload")}
                 className="flex w-full items-center justify-between rounded-2xl bg-gradient-to-r from-purple-600 to-cyan-500 p-4 font-semibold text-white transition hover:scale-[1.02]"
               >
                 <span>Upload Resume</span>

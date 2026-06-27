@@ -13,9 +13,21 @@ const app = express();
 const authRoutes = require("./router/authRoutes");
 const resumeRoutes = require("./router/resumeRoutes");
 const interviewRoutes = require("./router/interviewRoutes");
+const allowedOrigins = [
+  "http://localhost:3000",
+  "https://frontend-eight-nu-60.vercel.app",
+  /\.vercel\.app$/,
+];
 app.use(
   cors({
-    origin: "http://localhost:3000",
+    origin: function (origin, callback) {
+      if (!origin) return callback(null, true);
+      const allowed = allowedOrigins.some((o) =>
+        typeof o === "string" ? o === origin : o.test(origin)
+      );
+      if (allowed) return callback(null, true);
+      callback(new Error("Not allowed by CORS"));
+    },
     credentials: true,
   }),
 );
