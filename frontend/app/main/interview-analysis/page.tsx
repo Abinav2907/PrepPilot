@@ -154,7 +154,7 @@ export default function InterviewAnalysisPage() {
           <h3 className="text-2xl font-bold text-white">Strengths</h3>
 
           <div className="mt-6 space-y-4">
-            {interviewData.strengths.map((item) => (
+            {(interviewData.strengths || []).map((item) => (
               <div
                 key={item}
                 className="
@@ -176,7 +176,7 @@ export default function InterviewAnalysisPage() {
           <h3 className="text-2xl font-bold text-white">Areas To Improve</h3>
 
           <div className="mt-6 space-y-4">
-            {interviewData.weaknesses.map((item) => (
+            {(interviewData.weaknesses || []).map((item) => (
               <div
                 key={item}
                 className="

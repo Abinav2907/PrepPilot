@@ -1,6 +1,7 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { supabase } from "@/lib/supabase";
 
 import Sidebar from "@/components/Sidebar";
 import TopNavbar from "@/components/TopNavbar";
@@ -11,6 +12,41 @@ export default function MainLayout({
   children: React.ReactNode;
 }) {
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  const [user, setUser] = useState({
+    name: "",
+    email: "",
+    role: "",
+  });
+
+  useEffect(() => {
+    const loadUser = async () => {
+      const {
+        data: { user: authUser },
+      } = await supabase.auth.getUser();
+
+      if (!authUser) return;
+
+      const { data: profile, error } = await supabase
+        .from("profiles")
+        .select("full_name,target_role")
+        .eq("id", authUser.id)
+        .single();
+
+      if (error) {
+        console.error(error);
+        return;
+      }
+
+      setUser({
+        name: profile?.full_name || "",
+        email: authUser.email || "",
+        role: profile?.target_role || "",
+      });
+    };
+
+    loadUser();
+  }, []);
 
   return (
     <div className="min-h-screen bg-[#020617] text-white">
@@ -33,7 +69,7 @@ export default function MainLayout({
 
       {/* Main Content */}
       <div className="lg:ml-[320px]">
-        <TopNavbar onMenuClick={() => setSidebarOpen(true)} />
+        <TopNavbar onMenuClick={() => setSidebarOpen(true)} user={user} />
 
         <main
           className="

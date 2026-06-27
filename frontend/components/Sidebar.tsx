@@ -45,11 +45,6 @@ const navItems = [
     href: "/main/roadmap",
     icon: Map,
   },
-  {
-    label: "Profile",
-    href: "/main/profile",
-    icon: User,
-  },
 ];
 
 export default function Sidebar() {
