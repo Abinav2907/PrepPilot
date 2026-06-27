@@ -32,17 +32,29 @@ function VerifyOtpContent() {
   const handleResendOtp = async () => {
     if (timer > 0) return;
 
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-    });
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/auth/send-otp`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          email,
+        }),
+      });
 
-    if (error) {
-      alert(error.message);
-      return;
+      const data = await res.json();
+
+      if (data.success) {
+        setTimer(60);
+        alert("OTP sent again");
+      } else {
+        alert(data.message || "Failed to send OTP");
+      }
+    } catch (err) {
+      console.error(err);
+      alert("Server Error");
     }
-
-    setTimer(60);
-    alert("OTP sent again");
   };
   const handleChange = (value: string, index: number) => {
     if (!/^\d*$/.test(value)) return;

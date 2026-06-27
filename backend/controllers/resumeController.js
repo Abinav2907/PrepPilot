@@ -3,11 +3,13 @@ const { GoogleGenAI } = require("@google/genai");
 const Groq = require("groq-sdk");
 const supabase = require("../supabase");
 
+const pdfParse = require("pdf-parse");
+
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
 // Gemini first (PDF support), Groq fallback (text only)
-async function callAI(prompt, pdfBase64 = null) {
+async function callAI(prompt, pdfBase64 = null, pdfBuffer = null) {
   try {
     const contents = pdfBase64
       ? [
@@ -27,9 +29,20 @@ async function callAI(prompt, pdfBase64 = null) {
     console.warn("⚠️ Gemini failed:", geminiErr.message);
     console.log("🔄 Switching to Groq (Llama 3.3 70B)...");
 
+    let textPrompt = prompt;
+    if (pdfBuffer) {
+      try {
+        const parsed = await pdfParse(pdfBuffer);
+        textPrompt = `${prompt}\n\nHere is the resume content extracted from PDF:\n${parsed.text}`;
+        console.log("📄 Successfully parsed PDF text for Groq fallback.");
+      } catch (parseErr) {
+        console.error("❌ Failed to parse PDF text:", parseErr.message);
+      }
+    }
+
     const groqResponse = await groq.chat.completions.create({
       model: "llama-3.3-70b-versatile",
-      messages: [{ role: "user", content: prompt }],
+      messages: [{ role: "user", content: textPrompt }],
       temperature: 0.7,
     });
 
@@ -46,13 +59,28 @@ exports.analyzeResume = async (req, res) => {
     console.log("USER:", userId);
     console.log("RESUME URL:", resumeUrl);
 
-    const pdfResponse = await axios.get(resumeUrl, {
-      responseType: "arraybuffer",
-    });
+    let pdfBuffer;
 
-    console.log("PDF SIZE:", pdfResponse.data.length);
+    try {
+      const fileName = resumeUrl.split("/").pop();
+      console.log("Downloading via Supabase Storage Admin:", fileName);
+      const { data: fileData, error: downloadError } = await supabase.storage
+        .from("resumes")
+        .download(fileName);
 
-    const pdfBase64 = Buffer.from(pdfResponse.data).toString("base64");
+      if (downloadError) throw downloadError;
+      pdfBuffer = Buffer.from(await fileData.arrayBuffer());
+    } catch (supabaseErr) {
+      console.warn("⚠️ Supabase admin download failed, falling back to axios.get:", supabaseErr.message);
+      const pdfResponse = await axios.get(resumeUrl, {
+        responseType: "arraybuffer",
+      });
+      pdfBuffer = Buffer.from(pdfResponse.data);
+    }
+
+    console.log("PDF SIZE:", pdfBuffer.length);
+
+    const pdfBase64 = pdfBuffer.toString("base64");
 
     const prompt = `
 Analyze this resume thoroughly.
@@ -88,7 +116,7 @@ Rules:
 - Do not leave missing_skill_list empty.
 `;
 
-    const aiResponse = await callAI(prompt, pdfBase64);
+    const aiResponse = await callAI(prompt, pdfBase64, pdfBuffer);
     console.log("AI RESPONSE:", aiResponse);
 
     const cleaned = aiResponse
