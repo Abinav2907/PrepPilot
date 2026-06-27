@@ -1,11 +1,44 @@
 const axios = require("axios");
 const { GoogleGenAI } = require("@google/genai");
+const Groq = require("groq-sdk");
 const supabase = require("../supabase");
 
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-});
+const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
+// Gemini first (PDF support), Groq fallback (text only)
+async function callAI(prompt, pdfBase64 = null) {
+  try {
+    const contents = pdfBase64
+      ? [
+          { inlineData: { mimeType: "application/pdf", data: pdfBase64 } },
+          { text: prompt },
+        ]
+      : prompt;
+
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents,
+    });
+
+    console.log("✅ Used: Gemini 2.5 Flash");
+    return response.text;
+  } catch (geminiErr) {
+    console.warn("⚠️ Gemini failed:", geminiErr.message);
+    console.log("🔄 Switching to Groq (Llama 3.3 70B)...");
+
+    const groqResponse = await groq.chat.completions.create({
+      model: "llama-3.3-70b-versatile",
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.7,
+    });
+
+    console.log("✅ Used: Groq (Llama 3.3 70B)");
+    return groqResponse.choices[0].message.content;
+  }
+}
+
+// ─── Resume Analysis ──────────────────────────────────────────────
 exports.analyzeResume = async (req, res) => {
   try {
     const { userId, resumeUrl } = req.body;
@@ -13,32 +46,18 @@ exports.analyzeResume = async (req, res) => {
     console.log("USER:", userId);
     console.log("RESUME URL:", resumeUrl);
 
-    // Download PDF
     const pdfResponse = await axios.get(resumeUrl, {
       responseType: "arraybuffer",
     });
 
     console.log("PDF SIZE:", pdfResponse.data.length);
 
-    // Convert PDF to Base64
     const pdfBase64 = Buffer.from(pdfResponse.data).toString("base64");
 
-    // Send PDF directly to Gemini
-    const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
-      contents: [
-        {
-          inlineData: {
-            mimeType: "application/pdf",
-            data: pdfBase64,
-          },
-        },
-        {
-          text: `
+    const prompt = `
 Analyze this resume thoroughly.
 
 Evaluate:
-
 1. Resume quality
 2. ATS compatibility
 3. Technical skills
@@ -48,22 +67,17 @@ Evaluate:
 7. Education
 
 Return ONLY valid JSON:
-
 {
   "resume_score": number,
   "ats_score": number,
   "matched_skills": number,
   "missing_skills": number,
-  "missing_skill_list": [
-    "Docker",
-    "AWS",
-    "Git",
-    "MongoDB"
-  ],
+  "missing_skill_list": ["Docker", "AWS", "Git", "MongoDB"],
   "strengths": [],
   "weaknesses": [],
   "recommendations": []
 }
+
 Rules:
 - Generate realistic scores.
 - Do not use fixed values.
@@ -72,29 +86,18 @@ Rules:
 - missing_skill_list must contain actual missing technical skills.
 - Return at least 3 skills whenever possible.
 - Do not leave missing_skill_list empty.
-`,
-        },
-      ],
-    });
+`;
 
-    const aiResponse = response.text;
+    const aiResponse = await callAI(prompt, pdfBase64);
+    console.log("AI RESPONSE:", aiResponse);
 
-    console.log("AI RESPONSE:");
-    console.log(aiResponse);
-
-    const cleanedResponse = aiResponse
+    const cleaned = aiResponse
       .replace(/```json/g, "")
       .replace(/```/g, "")
       .trim();
 
-    const analysis = JSON.parse(cleanedResponse);
-    console.log("FULL ANALYSIS:");
-    console.log(JSON.stringify(analysis, null, 2));
-
-    console.log("MISSING SKILL LIST:");
-    console.log(analysis.missing_skill_list);
-    console.log("PARSED ANALYSIS:");
-    console.log(analysis);
+    const analysis = JSON.parse(cleaned);
+    console.log("FULL ANALYSIS:", JSON.stringify(analysis, null, 2));
 
     const { data, error } = await supabase
       .from("resume_analysis")
@@ -105,16 +108,12 @@ Rules:
           ats_score: analysis.ats_score,
           matched_skills: analysis.matched_skills,
           missing_skills: analysis.missing_skills,
-
           missing_skill_list: analysis.missing_skill_list,
-
           strengths: analysis.strengths,
           weaknesses: analysis.weaknesses,
           recommendations: analysis.recommendations,
         },
-        {
-          onConflict: "user_id",
-        },
+        { onConflict: "user_id" },
       )
       .select();
 
@@ -125,14 +124,9 @@ Rules:
 
     console.log("SAVED DATA:", data);
 
-    return res.status(200).json({
-      success: true,
-      analysis,
-    });
+    return res.status(200).json({ success: true, analysis });
   } catch (error) {
-    console.log("ERROR:");
-    console.log(error);
-
+    console.log("ERROR:", error);
     return res.status(500).json({
       success: false,
       message: "Analysis failed",
@@ -140,6 +134,8 @@ Rules:
     });
   }
 };
+
+// ─── Download PDF Report ──────────────────────────────────────────
 const PDFDocument = require("pdfkit");
 
 exports.downloadReport = async (req, res) => {
@@ -165,58 +161,38 @@ exports.downloadReport = async (req, res) => {
       "Content-Disposition",
       "attachment; filename=PrepPilot_Report.pdf",
     );
-
     res.setHeader("Content-Type", "application/pdf");
 
     doc.pipe(res);
 
-    doc.fontSize(22).text("PrepPilot Resume Report", {
-      align: "center",
-    });
-
+    doc.fontSize(22).text("PrepPilot Resume Report", { align: "center" });
     doc.moveDown();
-
     doc.fontSize(16).text(`Resume Score: ${data.resume_score}`);
     doc.text(`ATS Score: ${data.ats_score}`);
     doc.text(`Matched Skills: ${data.matched_skills}`);
     doc.text(`Missing Skills: ${data.missing_skills}`);
-
     doc.moveDown();
 
     doc.fontSize(18).text("Strengths");
-
-    data.strengths?.forEach((item) => {
-      doc.fontSize(12).text(`• ${item}`);
-    });
-
+    data.strengths?.forEach((item) => doc.fontSize(12).text(`• ${item}`));
     doc.moveDown();
 
     doc.fontSize(18).text("Weaknesses");
-
-    data.weaknesses?.forEach((item) => {
-      doc.fontSize(12).text(`• ${item}`);
-    });
-
+    data.weaknesses?.forEach((item) => doc.fontSize(12).text(`• ${item}`));
     doc.moveDown();
 
     doc.fontSize(18).text("Recommended Skills");
-
-    data.missing_skill_list?.forEach((item) => {
-      doc.fontSize(12).text(`• ${item}`);
-    });
-
+    data.missing_skill_list?.forEach((item) =>
+      doc.fontSize(12).text(`• ${item}`),
+    );
     doc.moveDown();
 
     doc.fontSize(18).text("AI Recommendations");
-
-    data.recommendations?.forEach((item) => {
-      doc.fontSize(12).text(`• ${item}`);
-    });
+    data.recommendations?.forEach((item) => doc.fontSize(12).text(`• ${item}`));
 
     doc.end();
   } catch (err) {
     console.log(err);
-
     return res.status(500).json({
       success: false,
       message: "Failed to generate PDF",

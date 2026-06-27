@@ -1,10 +1,10 @@
 "use client";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, Suspense } from "react";
 import Link from "next/link";
 
 import { useSearchParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-export default function VerifyOtpPage() {
+function VerifyOtpContent() {
   const searchParams = useSearchParams();
   const router = useRouter();
   const [timer, setTimer] = useState(60);
@@ -249,7 +249,7 @@ export default function VerifyOtpPage() {
 
         {/* Resend */}
         <div className="mt-6 text-center">
-          <p className="text-sm text-gray-400">Didn't receive the code?</p>
+          <p className="text-sm text-gray-400">Didn&apos;t receive the code?</p>
 
           <button
             onClick={handleResendOtp}
@@ -275,5 +275,20 @@ export default function VerifyOtpPage() {
         </div>
       </div>
     </main>
+  );
+}
+
+export default function VerifyOtpPage() {
+  return (
+    <Suspense fallback={
+      <main className="relative flex min-h-screen items-center justify-center overflow-hidden bg-[#050816] px-4 text-white">
+        <div className="text-center">
+          <div className="h-10 w-10 mx-auto border-4 border-cyan-500 border-t-transparent rounded-full animate-spin" />
+          <p className="mt-4 text-gray-400 font-medium">Loading verification screen...</p>
+        </div>
+      </main>
+    }>
+      <VerifyOtpContent />
+    </Suspense>
   );
 }

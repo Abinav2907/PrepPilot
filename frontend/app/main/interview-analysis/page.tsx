@@ -114,7 +114,7 @@ export default function InterviewAnalysisPage() {
           </h1>
 
           <p className="mt-5 text-lg leading-8 text-gray-400">
-            You haven't completed an AI interview yet.
+            You haven&apos;t completed an AI interview yet.
             <br />
             Take your first interview to receive a detailed performance
             analysis, personalized feedback, strengths, weaknesses, and

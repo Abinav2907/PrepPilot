@@ -3,17 +3,12 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import error from "next/dist/api/error";
 export default function ResumeAnalysisPage() {
   const router = useRouter();
   const [resume, setResume] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [analysis, setAnalysis] = useState<any>(null);
 
-  useEffect(() => {
-    loadResume();
-    loadAnalysis();
-  }, []);
   const handleDownload = async () => {
     window.open(
       `http://localhost:5000/api/resume/download/${resume.user_id}`,
@@ -88,6 +83,11 @@ export default function ResumeAnalysisPage() {
       console.log(error);
     }
   };
+
+  useEffect(() => {
+    loadResume();
+    loadAnalysis();
+  }, []);
 
   if (loading) {
     return (

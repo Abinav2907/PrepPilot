@@ -89,7 +89,7 @@ export default function Home() {
             className="mx-auto mb-10 max-w-3xl text-xl text-gray-400"
           >
             Upload your resume, get personalized mock interviews, receive
-            AI-driven feedback, and track your growth until you're interview
+            AI-driven feedback, and track your growth until you&apos;re interview
             ready.
           </motion.p>
 
@@ -388,8 +388,8 @@ export default function Home() {
           <div className="grid gap-8 md:grid-cols-3">
             <div className="rounded-3xl border border-white/10 bg-white/5 p-8 backdrop-blur-xl">
               <p className="mb-6 text-gray-300">
-                "PrepPilot completely changed how I prepare for interviews. The
-                personalized questions felt incredibly realistic."
+                &quot;PrepPilot completely changed how I prepare for interviews. The
+                personalized questions felt incredibly realistic.&quot;
               </p>
 
               <h4 className="font-bold">Rahul K.</h4>
@@ -398,8 +398,8 @@ export default function Home() {
 
             <div className="rounded-3xl border border-white/10 bg-white/5 p-8 backdrop-blur-xl">
               <p className="mb-6 text-gray-300">
-                "The AI feedback highlighted weaknesses I didn't even know I
-                had."
+                &quot;The AI feedback highlighted weaknesses I didn&apos;t even know I
+                had.&quot;
               </p>
 
               <h4 className="font-bold">Priya S.</h4>
@@ -408,7 +408,7 @@ export default function Home() {
 
             <div className="rounded-3xl border border-white/10 bg-white/5 p-8 backdrop-blur-xl">
               <p className="mb-6 text-gray-300">
-                "The roadmap feature helped me focus on exactly what I needed."
+                &quot;The roadmap feature helped me focus on exactly what I needed.&quot;
               </p>
 
               <h4 className="font-bold">Arjun M.</h4>
