@@ -8,6 +8,7 @@ export default function ResumeAnalysisPage() {
   const [resume, setResume] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [analysis, setAnalysis] = useState<any>(null);
+  const [viewUrl, setViewUrl] = useState<string>("");
 
   const handleDownload = async () => {
     window.open(
@@ -38,6 +39,24 @@ export default function ResumeAnalysisPage() {
       }
 
       setResume(data);
+
+      // Generate a signed URL so the resume opens correctly on both public
+      // and private Supabase storage buckets (public URL returns 400 for private buckets)
+      try {
+        const extension = data.file_name?.split(".").pop() || "pdf";
+        const storagePath = `${user.id}.${extension}`;
+        const { data: signed } = await supabase.storage
+          .from("resumes")
+          .createSignedUrl(storagePath, 3600); // valid for 1 hour
+        if (signed?.signedUrl) {
+          setViewUrl(signed.signedUrl);
+        } else {
+          setViewUrl(data.file_url); // fallback to stored URL
+        }
+      } catch (signErr) {
+        console.warn("Could not generate signed URL, using stored URL:", signErr);
+        setViewUrl(data.file_url);
+      }
     } catch (error) {
       console.log(error);
     } finally {
@@ -163,14 +182,25 @@ export default function ResumeAnalysisPage() {
             {new Date(resume.created_at).toLocaleDateString()}
           </p>
 
-          <a
-            href={resume.file_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="mt-4 inline-block rounded-xl bg-cyan-600 px-5 py-2 text-white font-semibold hover:bg-cyan-500 transition-colors"
-          >
-            View Resume
-          </a>
+          {viewUrl ? (
+            <a
+              href={viewUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-4 inline-block rounded-xl bg-cyan-600 px-5 py-2 text-white font-semibold hover:bg-cyan-500 transition-colors"
+            >
+              View Resume
+            </a>
+          ) : (
+            <a
+              href={resume?.file_url || "#"}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="mt-4 inline-block rounded-xl bg-cyan-600 px-5 py-2 text-white font-semibold hover:bg-cyan-500 transition-colors opacity-70"
+            >
+              View Resume
+            </a>
+          )}
         </div>
       </div>
       {/* SCORE CARDS */}
