@@ -55,24 +55,79 @@ export default function ResumeUpload() {
         return;
       }
 
-      // Send the file DIRECTLY to the backend as multipart/form-data
-      // The backend (multer) reads req.file.buffer — no storage download needed
+      const extension = selectedFile.name.split(".").pop() || "pdf";
+      const fileName = `${user.id}.${extension}`;
+
+      // 1. Delete any old resume files for this user from the storage bucket
+      try {
+        console.log("Cleaning up old resume files in storage bucket...");
+        const { data: files, error: listError } = await supabase.storage
+          .from("resumes")
+          .list();
+
+        if (listError) throw listError;
+
+        if (files && files.length > 0) {
+          const filesToDelete = files
+            .filter((f) => f.name.startsWith(user.id))
+            .map((f) => f.name);
+
+          if (filesToDelete.length > 0) {
+            console.log("Deleting files:", filesToDelete);
+            const { error: removeError } = await supabase.storage
+              .from("resumes")
+              .remove(filesToDelete);
+            if (removeError) throw removeError;
+            console.log("✅ Old files deleted from storage");
+          }
+        }
+      } catch (cleanErr: any) {
+        console.warn("⚠️ Storage cleanup warning (non-fatal):", cleanErr.message);
+      }
+
+      // 2. Upload the new file to Supabase storage
+      console.log("Uploading new file to storage:", fileName);
+      const { error: uploadError } = await supabase.storage
+        .from("resumes")
+        .upload(fileName, selectedFile, {
+          upsert: true,
+        });
+
+      if (uploadError) {
+        throw uploadError;
+      }
+      console.log("✅ File uploaded to storage");
+
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from("resumes")
+        .getPublicUrl(fileName);
+      const fileUrl = urlData.publicUrl;
+
+      // 3. Update the resumes DB table using authenticated client
+      console.log("Updating resumes table...");
+      await supabase.from("resumes").delete().eq("user_id", user.id);
+      const { error: insertError } = await supabase.from("resumes").insert({
+        user_id: user.id,
+        file_name: selectedFile.name,
+        file_url: fileUrl,
+      });
+
+      if (insertError) {
+        throw insertError;
+      }
+      console.log("✅ resumes table updated in database");
+
+      // 4. Send the file directly to the backend for AI analysis
       const formData = new FormData();
       formData.append("resume", selectedFile, selectedFile.name);
       formData.append("userId", user.id);
 
-      console.log(
-        "Sending file directly to backend:",
-        selectedFile.name,
-        selectedFile.size,
-        "bytes"
-      );
-
+      console.log("Calling backend for analysis...");
       const response = await fetch(
         `${process.env.NEXT_PUBLIC_API_URL}/api/resume/analyze`,
         {
           method: "POST",
-          // Do NOT set Content-Type — let the browser set it with the boundary
           body: formData,
         }
       );
@@ -84,7 +139,33 @@ export default function ResumeUpload() {
         throw new Error(result.message || "Analysis failed");
       }
 
-      // Navigate to results page
+      // 5. Save the analysis to the resume_analysis DB table
+      const analysis = result.analysis;
+      console.log("Saving analysis to database...");
+      const { error: analysisError } = await supabase
+        .from("resume_analysis")
+        .upsert(
+          {
+            user_id: user.id,
+            resume_score: analysis.resume_score,
+            ats_score: analysis.ats_score,
+            matched_skills: analysis.matched_skills,
+            missing_skills: analysis.missing_skills,
+            missing_skill_list: analysis.missing_skill_list || [],
+            strengths: analysis.strengths || [],
+            weaknesses: analysis.weaknesses || [],
+            recommendations: analysis.recommendations || [],
+          },
+          {
+            onConflict: "user_id",
+          }
+        );
+
+      if (analysisError) {
+        throw analysisError;
+      }
+      console.log("✅ Analysis saved to DB");
+
       router.push("/main/resume-analysis");
     } catch (err: any) {
       console.error("Upload error:", err);
