@@ -69,22 +69,31 @@ exports.analyzeResume = async (req, res) => {
     const experienceLevel = profile?.degree || "Intermediate";
 
     let pdfBuffer;
+    const isSignedUrl = resumeUrl.includes("?token=");
 
-    try {
-      const fileName = resumeUrl.split("/").pop();
-      console.log("Downloading via Supabase Storage Admin:", fileName);
-      const { data: fileData, error: downloadError } = await supabase.storage
-        .from("resumes")
-        .download(fileName);
-
-      if (downloadError) throw downloadError;
-      pdfBuffer = Buffer.from(await fileData.arrayBuffer());
-    } catch (supabaseErr) {
-      console.warn("⚠️ Supabase admin download failed, falling back to axios.get:", supabaseErr.message);
+    if (isSignedUrl) {
+      console.log("Directly downloading signed URL via axios...");
       const pdfResponse = await axios.get(resumeUrl, {
         responseType: "arraybuffer",
       });
       pdfBuffer = Buffer.from(pdfResponse.data);
+    } else {
+      try {
+        const fileName = resumeUrl.split("?")[0].split("/").pop();
+        console.log("Downloading via Supabase Storage Admin:", fileName);
+        const { data: fileData, error: downloadError } = await supabase.storage
+          .from("resumes")
+          .download(fileName);
+
+        if (downloadError) throw downloadError;
+        pdfBuffer = Buffer.from(await fileData.arrayBuffer());
+      } catch (supabaseErr) {
+        console.warn("⚠️ Supabase admin download failed, falling back to axios.get:", supabaseErr.message);
+        const pdfResponse = await axios.get(resumeUrl, {
+          responseType: "arraybuffer",
+        });
+        pdfBuffer = Buffer.from(pdfResponse.data);
+      }
     }
 
     if (!pdfBuffer || pdfBuffer.length === 0) {

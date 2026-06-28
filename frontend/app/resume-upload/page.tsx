@@ -118,6 +118,18 @@ export default function ResumeUpload() {
 
       console.log("DB DATA:", dbData);
       console.log("DB ERROR:", dbError);
+      // Generate a signed URL for the backend to safely download the private PDF file
+      const { data: signedData, error: signedError } = await supabase.storage
+        .from("resumes")
+        .createSignedUrl(fileName, 600); // valid for 10 minutes
+
+      if (signedError) {
+        console.warn("Signed URL generation failed, falling back to public URL:", signedError.message);
+      }
+
+      const analysisUrl = signedData?.signedUrl || fileUrl;
+      console.log("Passing download URL to backend:", analysisUrl);
+
       const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/resume/analyze`, {
         method: "POST",
         headers: {
@@ -125,7 +137,7 @@ export default function ResumeUpload() {
         },
         body: JSON.stringify({
           userId: user.id,
-          resumeUrl: fileUrl,
+          resumeUrl: analysisUrl,
         }),
       });
 
