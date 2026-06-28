@@ -1,57 +1,121 @@
-const axios = require("axios");
 const { GoogleGenAI } = require("@google/genai");
 const Groq = require("groq-sdk");
 const supabase = require("../supabase");
-
 const pdfParse = require("pdf-parse");
 
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-// Gemini primary (native PDF vision), Groq fallback (extracted text)
-async function callAI(prompt, pdfBase64 = null) {
-  // ── Primary: Gemini (reads the actual PDF natively) ──────────────
+// ── AI call: Gemini primary (native PDF vision), Groq fallback ────────────────
+async function callAI(prompt, pdfBase64, extractedText) {
+  // Primary: Gemini — reads the actual PDF bytes natively
   try {
-    const contents = pdfBase64
-      ? [
-          { inlineData: { mimeType: "application/pdf", data: pdfBase64 } },
-          { text: prompt },
-        ]
-      : prompt;
-
+    console.log("📤 Calling Gemini 2.0 Flash with PDF...");
     const response = await ai.models.generateContent({
       model: "gemini-2.0-flash",
-      contents,
+      contents: [
+        { inlineData: { mimeType: "application/pdf", data: pdfBase64 } },
+        { text: prompt },
+      ],
     });
-
-    console.log("✅ Used: Gemini 2.5 Flash (native PDF)");
+    console.log("✅ Gemini succeeded");
     return response.text;
   } catch (geminiErr) {
-    console.warn("⚠️ Gemini failed:", geminiErr.message);
-    console.log("🔄 Falling back to Groq (Llama 3.3 70B)...");
+    console.warn("⚠️  Gemini failed:", geminiErr.message);
+    console.log("🔄 Falling back to Groq Llama 3.3 70B (text mode)...");
 
-    // ── Fallback: Groq (receives extracted text injected in prompt) ────
+    // Groq fallback — inject extracted text so it can actually read the resume
+    let groqPrompt = prompt;
+    if (extractedText && extractedText.trim().length > 80) {
+      groqPrompt =
+        `${prompt}\n\n=== RESUME TEXT START ===\n${extractedText}\n=== RESUME TEXT END ===`;
+      console.log(
+        "📄 Injecting extracted PDF text into Groq prompt, length:",
+        extractedText.length
+      );
+    } else {
+      console.warn(
+        "⚠️  Extracted text too short or empty — Groq will score as blank resume"
+      );
+      groqPrompt =
+        `${prompt}\n\n[RESUME IS BLANK OR UNREADABLE. Score resume_score and ats_score between 5 and 20.]`;
+    }
+
     const groqResponse = await groq.chat.completions.create({
       model: "llama-3.3-70b-versatile",
-      messages: [{ role: "user", content: prompt }],
+      messages: [{ role: "user", content: groqPrompt }],
       temperature: 0.2,
       max_tokens: 1024,
     });
 
-    console.log("✅ Used: Groq (Llama 3.3 70B) - fallback");
+    console.log("✅ Groq fallback succeeded");
     return groqResponse.choices[0].message.content;
   }
 }
 
-// ─── Resume Analysis ──────────────────────────────────────────────
+// ─── Resume Analysis (accepts multipart/form-data with the PDF file) ──────────
 exports.analyzeResume = async (req, res) => {
   try {
-    const { userId, resumeUrl } = req.body;
+    // multer puts the file in req.file and text fields in req.body
+    const userId = req.body.userId;
+    const file = req.file; // { buffer, originalname, mimetype, size }
 
     console.log("USER:", userId);
-    console.log("RESUME URL:", resumeUrl);
+    console.log(
+      "FILE:",
+      file ? `${file.originalname} (${file.size} bytes)` : "MISSING"
+    );
 
-    // Fetch user profile to tailor analysis
+    if (!userId) {
+      return res.status(400).json({ success: false, message: "userId is required" });
+    }
+    if (!file || !file.buffer || file.buffer.length === 0) {
+      return res
+        .status(400)
+        .json({ success: false, message: "Resume file is required" });
+    }
+
+    // ── Save file to Supabase Storage so "View Resume" still works ────────────
+    const extension = file.originalname.split(".").pop() || "pdf";
+    const storageFileName = `${userId}.${extension}`;
+    const { error: storageError } = await supabase.storage
+      .from("resumes")
+      .upload(storageFileName, file.buffer, {
+        upsert: true,
+        contentType: file.mimetype || "application/pdf",
+      });
+    if (storageError) {
+      console.warn("⚠️  Storage upload failed (non-fatal):", storageError.message);
+    } else {
+      console.log("✅ Resume saved to storage:", storageFileName);
+    }
+
+    // Save / update resumes table record
+    const { data: publicUrlData } = supabase.storage
+      .from("resumes")
+      .getPublicUrl(storageFileName);
+    const fileUrl = publicUrlData?.publicUrl || "";
+
+    const { data: existingResume } = await supabase
+      .from("resumes")
+      .select("id")
+      .eq("user_id", userId)
+      .maybeSingle();
+
+    if (existingResume) {
+      await supabase
+        .from("resumes")
+        .update({ file_name: file.originalname, file_url: fileUrl })
+        .eq("user_id", userId);
+    } else {
+      await supabase.from("resumes").insert({
+        user_id: userId,
+        file_name: file.originalname,
+        file_url: fileUrl,
+      });
+    }
+
+    // ── Fetch profile to tailor analysis ─────────────────────────────────────
     let profile = null;
     try {
       const { data: profileData } = await supabase
@@ -60,47 +124,34 @@ exports.analyzeResume = async (req, res) => {
         .eq("id", userId)
         .maybeSingle();
       profile = profileData;
-      console.log("Tailoring resume analysis for profile:", profile);
+      console.log(
+        "Profile loaded — target role:",
+        profile?.target_role || "Software Developer"
+      );
     } catch (profileErr) {
-      console.warn("⚠️ Failed to fetch profile for resume analysis:", profileErr.message);
+      console.warn("⚠️  Profile fetch failed:", profileErr.message);
     }
 
     const targetRole = profile?.target_role || "Software Developer";
     const experienceLevel = profile?.degree || "Intermediate";
 
-    let pdfBuffer;
-    const isSignedUrl = resumeUrl.includes("?token=");
+    const pdfBuffer = file.buffer;
+    console.log("PDF size:", pdfBuffer.length, "bytes");
 
-    if (isSignedUrl) {
-      console.log("Directly downloading signed URL via axios...");
-      const pdfResponse = await axios.get(resumeUrl, {
-        responseType: "arraybuffer",
-      });
-      pdfBuffer = Buffer.from(pdfResponse.data);
-    } else {
-      try {
-        const fileName = resumeUrl.split("?")[0].split("/").pop();
-        console.log("Downloading via Supabase Storage Admin:", fileName);
-        const { data: fileData, error: downloadError } = await supabase.storage
-          .from("resumes")
-          .download(fileName);
-
-        if (downloadError) throw downloadError;
-        pdfBuffer = Buffer.from(await fileData.arrayBuffer());
-      } catch (supabaseErr) {
-        console.warn("⚠️ Supabase admin download failed, falling back to axios.get:", supabaseErr.message);
-        const pdfResponse = await axios.get(resumeUrl, {
-          responseType: "arraybuffer",
-        });
-        pdfBuffer = Buffer.from(pdfResponse.data);
+    // ── Extract text for Groq fallback ────────────────────────────────────────
+    let extractedText = "";
+    try {
+      const parsed = await pdfParse(pdfBuffer);
+      extractedText = parsed.text.trim();
+      console.log("📄 PDF text extracted, length:", extractedText.length, "chars");
+      if (extractedText.length < 80) {
+        console.warn(
+          "⚠️  Very short extracted text — may be image-based or corrupt PDF"
+        );
       }
+    } catch (parseErr) {
+      console.error("❌ pdf-parse failed:", parseErr.message);
     }
-
-    if (!pdfBuffer || pdfBuffer.length === 0) {
-      throw new Error("Unable to download resume file from storage. Please verify the backend SUPABASE_SERVICE_ROLE_KEY is set to the Service Role Key (not the Anon Key) in your Render settings.");
-    }
-
-    console.log("PDF SIZE:", pdfBuffer.length);
 
     const pdfBase64 = pdfBuffer.toString("base64");
 
@@ -111,80 +162,60 @@ Analyze this candidate's resume for the role of: "${targetRole}" (${experienceLe
 Strictly evaluate the resume against standard market requirements for "${targetRole}" and the candidate's actual qualifications.
 
 Evaluation Metrics:
-1. ATS Compatibility (Format, section headers, readability, and keyword match for "${targetRole}").
-2. Core Technical Skills (Does the resume list relevant skills for "${targetRole}"? How many are matched vs. missing?).
+1. ATS Compatibility (Format, section headers, readability, keyword match for "${targetRole}").
+2. Core Technical Skills (Does the resume list relevant skills for "${targetRole}"? How many are matched vs. missing?)
 3. Strengths (At least 2-3 specific, detailed professional highlights from the resume content).
-4. Weaknesses (At least 2-3 specific gaps relative to the "${targetRole}" role, like missing skills or lack of projects/metrics).
+4. Weaknesses (At least 2-3 specific gaps relative to the "${targetRole}" role).
 5. Recommendations (Clear, actionable improvements for their resume, project section, or skills).
 
 Special Rules:
-- If the resume is empty, contains nonsense, or is extremely short/blank, you MUST score both resume_score and ats_score very low (e.g., between 5 and 30) and list "Missing resume content" or "Invalid format" as a major weakness.
-- Generate realistic scores out of 100 based on actual content matching. Do not use fixed template values.
+- If the resume is empty, contains nonsense, or is extremely short/blank, score both resume_score and ats_score very low (5–30) and list "Missing resume content" or "Invalid format" as a major weakness.
+- Generate realistic scores out of 100 based on actual content matching. Do NOT use fixed values like 80 or 85 every time.
 - Do NOT use generic template placeholders.
-- missing_skill_list must contain actual missing technical skills needed for "${targetRole}" that are not present in the resume.
-- Return at least 3 skills whenever possible.
-- Do not leave missing_skill_list empty.
+- missing_skill_list must contain actual missing technical skills needed for "${targetRole}" that are NOT present in the resume.
+- Return at least 3 skills in missing_skill_list whenever possible.
 
-Return ONLY a valid JSON object matching this schema:
+Return ONLY a valid JSON object matching this exact schema (no markdown, no extra text):
 {
   "resume_score": number,
   "ats_score": number,
   "matched_skills": number,
   "missing_skills": number,
-  "missing_skill_list": ["Docker", "AWS", "Git", "MongoDB"],
+  "missing_skill_list": ["skill1", "skill2"],
   "strengths": ["string"],
   "weaknesses": ["string"],
   "recommendations": ["string"]
 }
 `;
 
-    // Extract text from PDF upfront so Groq can read actual resume content
-    let extractedText = "";
-    try {
-      const parsed = await pdfParse(pdfBuffer);
-      extractedText = parsed.text.trim();
-      console.log("📄 PDF text extracted, length:", extractedText.length, "chars");
-    } catch (parseErr) {
-      console.error("❌ pdf-parse failed:", parseErr.message);
-    }
+    const aiResponse = await callAI(prompt, pdfBase64, extractedText);
+    console.log("RAW AI RESPONSE:", aiResponse?.substring(0, 300));
 
-    // Build the full prompt for Groq with clearly demarcated resume text
-    let fullPrompt;
-    if (extractedText.length > 80) {
-      fullPrompt = `${prompt}\n\n=== RESUME CONTENT START ===\n${extractedText}\n=== RESUME CONTENT END ===`;
-    } else {
-      // Resume text is empty or unreadable — instruct model to score very low
-      console.warn("⚠️ Extracted resume text is empty or too short — scoring as empty resume");
-      fullPrompt = `${prompt}\n\n[RESUME IS BLANK OR UNREADABLE. Score resume_score and ats_score between 5 and 20 and list 'Empty or unreadable resume' as the primary weakness.]`;
-    }
-
-    const aiResponse = await callAI(fullPrompt, pdfBase64);
-    console.log("AI RESPONSE:", aiResponse);
-
+    // Strip any markdown code fences
     const cleaned = aiResponse
-      .replace(/```json/g, "")
-      .replace(/```/g, "")
+      .replace(/```json\s*/gi, "")
+      .replace(/```\s*/gi, "")
       .trim();
 
-    const analysis = JSON.parse(cleaned);
-    console.log("FULL ANALYSIS:", JSON.stringify(analysis, null, 2));
-
-    // Convert scores to integers out of 100 to prevent Postgres invalid input syntax errors
-    let resumeScore = parseFloat(analysis.resume_score);
-    let atsScore = parseFloat(analysis.ats_score);
-
-    // If the model returned a float between 0 and 1 (e.g. 0.85), scale it to 100 (e.g. 85)
-    if (resumeScore <= 1.0 && resumeScore > 0) {
-      resumeScore = Math.round(resumeScore * 100);
-    } else {
-      resumeScore = Math.round(resumeScore) || 80;
+    let analysis;
+    try {
+      analysis = JSON.parse(cleaned);
+    } catch (parseErr) {
+      console.error("❌ JSON parse failed, raw response:", aiResponse);
+      throw new Error("AI returned invalid JSON: " + parseErr.message);
     }
 
-    if (atsScore <= 1.0 && atsScore > 0) {
-      atsScore = Math.round(atsScore * 100);
-    } else {
-      atsScore = Math.round(atsScore) || 80;
-    }
+    console.log("PARSED ANALYSIS:", JSON.stringify(analysis, null, 2));
+
+    // Normalise scores
+    let resumeScore = parseFloat(analysis.resume_score) || 0;
+    let atsScore = parseFloat(analysis.ats_score) || 0;
+
+    if (resumeScore > 0 && resumeScore <= 1) resumeScore = Math.round(resumeScore * 100);
+    else resumeScore = Math.round(resumeScore);
+
+    if (atsScore > 0 && atsScore <= 1) atsScore = Math.round(atsScore * 100);
+    else atsScore = Math.round(atsScore);
 
     resumeScore = Math.max(0, Math.min(100, resumeScore));
     atsScore = Math.max(0, Math.min(100, atsScore));
@@ -192,13 +223,13 @@ Return ONLY a valid JSON object matching this schema:
     const matchedSkills = Math.round(parseFloat(analysis.matched_skills)) || 0;
     const missingSkills = Math.round(parseFloat(analysis.missing_skills)) || 0;
 
-    // Update analysis object with normalized values
     analysis.resume_score = resumeScore;
     analysis.ats_score = atsScore;
     analysis.matched_skills = matchedSkills;
     analysis.missing_skills = missingSkills;
 
-    const { data, error } = await supabase
+    // Save analysis to DB
+    const { error: dbError } = await supabase
       .from("resume_analysis")
       .upsert(
         {
@@ -212,29 +243,27 @@ Return ONLY a valid JSON object matching this schema:
           weaknesses: analysis.weaknesses || [],
           recommendations: analysis.recommendations || [],
         },
-        { onConflict: "user_id" },
+        { onConflict: "user_id" }
       )
       .select();
 
-    if (error) {
-      console.log("SUPABASE ERROR:", error);
-      throw new Error(`Database error saving analysis: ${error.message}`);
+    if (dbError) {
+      console.error("SUPABASE DB ERROR:", dbError);
+      throw new Error(`Database error saving analysis: ${dbError.message}`);
     }
 
-    console.log("SAVED DATA:", data);
-
+    console.log("✅ Analysis saved to DB successfully");
     return res.status(200).json({ success: true, analysis });
   } catch (error) {
     console.error("ANALYSIS ERROR:", error);
     return res.status(500).json({
       success: false,
       message: error.message || "Analysis failed",
-      error: error.message,
     });
   }
 };
 
-// ─── Download PDF Report ──────────────────────────────────────────
+// ─── Download PDF Report ──────────────────────────────────────────────────────
 const PDFDocument = require("pdfkit");
 
 exports.downloadReport = async (req, res) => {
@@ -248,20 +277,12 @@ exports.downloadReport = async (req, res) => {
       .single();
 
     if (error || !data) {
-      return res.status(404).json({
-        success: false,
-        message: "Report not found",
-      });
+      return res.status(404).json({ success: false, message: "Report not found" });
     }
 
     const doc = new PDFDocument();
-
-    res.setHeader(
-      "Content-Disposition",
-      "attachment; filename=PrepPilot_Report.pdf",
-    );
+    res.setHeader("Content-Disposition", "attachment; filename=PrepPilot_Report.pdf");
     res.setHeader("Content-Type", "application/pdf");
-
     doc.pipe(res);
 
     doc.fontSize(22).text("PrepPilot Resume Report", { align: "center" });
@@ -281,9 +302,7 @@ exports.downloadReport = async (req, res) => {
     doc.moveDown();
 
     doc.fontSize(18).text("Recommended Skills");
-    data.missing_skill_list?.forEach((item) =>
-      doc.fontSize(12).text(`• ${item}`),
-    );
+    data.missing_skill_list?.forEach((item) => doc.fontSize(12).text(`• ${item}`));
     doc.moveDown();
 
     doc.fontSize(18).text("AI Recommendations");
@@ -291,10 +310,7 @@ exports.downloadReport = async (req, res) => {
 
     doc.end();
   } catch (err) {
-    console.log(err);
-    return res.status(500).json({
-      success: false,
-      message: "Failed to generate PDF",
-    });
+    console.error("downloadReport error:", err);
+    return res.status(500).json({ success: false, message: "Failed to generate PDF" });
   }
 };

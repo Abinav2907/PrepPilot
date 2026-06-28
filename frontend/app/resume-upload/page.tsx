@@ -3,9 +3,9 @@
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+
 export default function ResumeUpload() {
   const router = useRouter();
-
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -23,20 +23,16 @@ export default function ResumeUpload() {
       setError("Only PDF and DOCX files are allowed.");
       return false;
     }
-
-    if (file.size > 5 * 1024 * 1024) {
-      setError("File size must be less than 5MB.");
+    if (file.size > 10 * 1024 * 1024) {
+      setError("File size must be less than 10MB.");
       return false;
     }
-
     return true;
   };
 
   const handleFileSelect = (file: File) => {
     setError("");
-
     if (!validateFile(file)) return;
-
     setSelectedFile(file);
   };
 
@@ -59,128 +55,40 @@ export default function ResumeUpload() {
         return;
       }
 
-      const extension = selectedFile.name.split(".").pop();
-      const fileName = `${user.id}.${extension}`;
+      // Send the file DIRECTLY to the backend as multipart/form-data
+      // The backend (multer) reads req.file.buffer — no storage download needed
+      const formData = new FormData();
+      formData.append("resume", selectedFile, selectedFile.name);
+      formData.append("userId", user.id);
 
-      const { data: uploadData, error: uploadError } = await supabase.storage
-        .from("resumes")
-        .upload(fileName, selectedFile, {
-          upsert: true,
-        });
+      console.log(
+        "Sending file directly to backend:",
+        selectedFile.name,
+        selectedFile.size,
+        "bytes"
+      );
 
-      console.log("UPLOAD DATA:", uploadData);
-      console.log("UPLOAD ERROR:", uploadError);
-
-      if (uploadError) {
-        throw uploadError;
-      }
-
-      const { data: urlData } = supabase.storage
-        .from("resumes")
-        .getPublicUrl(fileName);
-
-      const fileUrl = urlData.publicUrl;
-
-      const { data: existingResume } = await supabase
-        .from("resumes")
-        .select("id")
-        .eq("user_id", user.id)
-        .maybeSingle();
-
-      let dbData: any = null;
-      let dbError: any = null;
-      console.log("EXISTING RESUME:", existingResume);
-      if (existingResume) {
-        const result = await supabase
-          .from("resumes")
-          .update({
-            file_name: selectedFile.name,
-            file_url: fileUrl,
-          })
-          .eq("user_id", user.id);
-
-        dbData = result.data;
-        dbError = result.error;
-      } else {
-        const result = await supabase.from("resumes").insert({
-          user_id: user.id,
-          file_name: selectedFile.name,
-          file_url: fileUrl,
-        });
-
-        dbData = result.data;
-        dbError = result.error;
-      }
-
-      if (dbError) {
-        throw dbError;
-      }
-
-      console.log("DB DATA:", dbData);
-      console.log("DB ERROR:", dbError);
-      // Generate a signed URL for the backend to safely download the private PDF file
-      const { data: signedData, error: signedError } = await supabase.storage
-        .from("resumes")
-        .createSignedUrl(fileName, 600); // valid for 10 minutes
-
-      if (signedError) {
-        console.warn("Signed URL generation failed, falling back to public URL:", signedError.message);
-      }
-
-      const analysisUrl = signedData?.signedUrl || fileUrl;
-      console.log("Passing download URL to backend:", analysisUrl);
-
-      const response = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/api/resume/analyze`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          userId: user.id,
-          resumeUrl: analysisUrl,
-        }),
-      });
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_API_URL}/api/resume/analyze`,
+        {
+          method: "POST",
+          // Do NOT set Content-Type — let the browser set it with the boundary
+          body: formData,
+        }
+      );
 
       const result = await response.json();
-
       console.log("BACKEND RESULT:", result);
 
       if (!result.success) {
         throw new Error(result.message || "Analysis failed");
       }
-      const analysis = result.analysis;
 
-      const { error: analysisError } = await supabase
-        .from("resume_analysis")
-        .upsert(
-          {
-            user_id: user.id,
-
-            resume_score: analysis.resume_score,
-            ats_score: analysis.ats_score,
-            matched_skills: analysis.matched_skills,
-            missing_skills: analysis.missing_skills,
-
-            strengths: analysis.strengths,
-            weaknesses: analysis.weaknesses,
-            recommendations: analysis.recommendations,
-          },
-          {
-            onConflict: "user_id",
-          },
-        );
-
-      if (analysisError) {
-        throw analysisError;
-      }
-
+      // Navigate to results page
       router.push("/main/resume-analysis");
-    } catch (error: any) {
-      console.log("FULL ERROR:", error);
-      console.log("MESSAGE:", error?.message);
-      console.log("DETAILS:", error?.details);
-
-      setError(error?.message || "Failed to upload resume.");
+    } catch (err: any) {
+      console.error("Upload error:", err);
+      setError(err?.message || "Failed to analyse resume. Please try again.");
     } finally {
       setUploading(false);
     }
@@ -190,18 +98,15 @@ export default function ResumeUpload() {
     <main className="relative min-h-screen overflow-hidden bg-[#050816] text-white">
       {/* Background Glow */}
       <div className="absolute left-0 top-0 h-[500px] w-[500px] rounded-full bg-purple-600/20 blur-[180px]" />
-
       <div className="absolute bottom-0 right-0 h-[500px] w-[500px] rounded-full bg-cyan-500/20 blur-[180px]" />
 
       <div className="relative z-10 flex min-h-screen items-center justify-center px-4 py-10">
         <div className="w-full max-w-4xl rounded-[32px] border border-white/10 bg-white/[0.04] p-6 backdrop-blur-2xl sm:p-8 md:p-12">
           {/* Header */}
-
           <div className="mb-10 text-center">
             <h1 className="text-4xl font-black md:text-6xl">
               Upload Your Resume
             </h1>
-
             <p className="mt-4 text-gray-400">
               Upload your latest resume and get AI-powered analysis.
             </p>
@@ -214,7 +119,6 @@ export default function ResumeUpload() {
           )}
 
           {/* Upload Area */}
-
           {!selectedFile ? (
             <div
               onDragOver={(e) => {
@@ -225,47 +129,22 @@ export default function ResumeUpload() {
               onDrop={(e) => {
                 e.preventDefault();
                 setDragActive(false);
-
                 const file = e.dataTransfer.files[0];
-
-                if (file) {
-                  handleFileSelect(file);
-                }
+                if (file) handleFileSelect(file);
               }}
               onClick={() => fileInputRef.current?.click()}
               className={`
-              cursor-pointer
-              rounded-3xl
-              border-2
-              border-dashed
-              p-10
-              md:p-16
-              text-center
-              transition-all
-
-              ${
-                dragActive
-                  ? "border-purple-500 bg-purple-500/10"
-                  : "border-white/10 bg-white/[0.03]"
-              }
-            `}
+                cursor-pointer rounded-3xl border-2 border-dashed p-10 md:p-16 text-center transition-all
+                ${dragActive ? "border-purple-500 bg-purple-500/10" : "border-white/10 bg-white/[0.03]"}
+              `}
             >
               <div className="space-y-4">
                 <div className="text-7xl">📄</div>
-
-                <h2 className="text-2xl font-bold">Drag & Drop Resume</h2>
-
-                <p className="text-gray-400">PDF or DOCX • Max 5MB</p>
-
+                <h2 className="text-2xl font-bold">Drag &amp; Drop Resume</h2>
+                <p className="text-gray-400">PDF or DOCX • Max 10MB</p>
                 <button
                   type="button"
-                  className="
-                  rounded-xl
-                  bg-white/10
-                  px-6
-                  py-3
-                  font-medium
-                "
+                  className="rounded-xl bg-white/10 px-6 py-3 font-medium"
                 >
                   Choose File
                 </button>
@@ -278,10 +157,7 @@ export default function ResumeUpload() {
                 accept=".pdf,.docx"
                 onChange={(e) => {
                   const file = e.target.files?.[0];
-
-                  if (file) {
-                    handleFileSelect(file);
-                  }
+                  if (file) handleFileSelect(file);
                 }}
               />
             </div>
@@ -289,23 +165,19 @@ export default function ResumeUpload() {
             <div className="rounded-3xl border border-green-500/20 bg-green-500/10 p-8">
               <div className="flex items-center gap-4">
                 <div className="text-4xl">✅</div>
-
                 <div className="flex-1">
                   <h3 className="font-semibold text-green-400">
                     Resume Selected
                   </h3>
-
                   <p className="text-gray-300">{selectedFile.name}</p>
-
                   <p className="text-sm text-gray-500">
                     {(selectedFile.size / 1024).toFixed(1)} KB
                   </p>
                 </div>
-
                 <button
                   onClick={() => {
                     setSelectedFile(null);
-                    fileInputRef.current?.click();
+                    if (fileInputRef.current) fileInputRef.current.value = "";
                   }}
                   className="rounded-lg bg-white/10 px-4 py-2"
                 >
@@ -315,31 +187,28 @@ export default function ResumeUpload() {
             </div>
           )}
 
-          {/* Selected File */}
-
-          {/* Upload Button */}
-
+          {/* Analyze Button */}
           <button
             onClick={handleUpload}
-            disabled={uploading}
+            disabled={uploading || !selectedFile}
             className="
-              mt-8
-              w-full
-              rounded-2xl
-              bg-gradient-to-r
-              from-purple-600
-              via-violet-500
-              to-cyan-500
-              py-4
-              text-lg
-              font-semibold
-              text-white
-              transition
-              hover:scale-[1.01]
-              disabled:opacity-50
+              mt-8 w-full rounded-2xl
+              bg-gradient-to-r from-purple-600 via-violet-500 to-cyan-500
+              py-4 text-lg font-semibold text-white transition
+              hover:scale-[1.01] disabled:opacity-50 disabled:cursor-not-allowed
             "
           >
-            {uploading ? "Analyzing Resume..." : "Analyze Resume"}
+            {uploading ? (
+              <span className="flex items-center justify-center gap-2">
+                <svg className="h-5 w-5 animate-spin" viewBox="0 0 24 24" fill="none">
+                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z" />
+                </svg>
+                Analysing Resume...
+              </span>
+            ) : (
+              "Analyse Resume"
+            )}
           </button>
         </div>
       </div>
