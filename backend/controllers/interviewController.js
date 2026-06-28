@@ -18,14 +18,14 @@ async function callAI(prompt) {
     return groqResponse.choices[0].message.content;
   } catch (groqErr) {
     console.warn("⚠️ Groq failed:", groqErr.message);
-    console.log("🔄 Switching to Gemini 2.5 Flash...");
+    console.log("🔄 Switching to Gemini 2.0 Flash...");
 
     const response = await ai.models.generateContent({
-      model: "gemini-2.5-flash",
+      model: "gemini-2.0-flash",
       contents: prompt,
     });
 
-    console.log("✅ Used: Gemini 2.5 Flash");
+    console.log("✅ Used: Gemini 2.0 Flash");
     return response.text;
   }
 }
