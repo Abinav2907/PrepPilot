@@ -106,15 +106,35 @@ export default function ResumeUpload() {
 
       // 3. Update the resumes DB table using authenticated client
       console.log("Updating resumes table...");
-      await supabase.from("resumes").delete().eq("user_id", user.id);
-      const { error: insertError } = await supabase.from("resumes").insert({
-        user_id: user.id,
-        file_name: selectedFile.name,
-        file_url: fileUrl,
-      });
+      const { data: existingResume } = await supabase
+        .from("resumes")
+        .select("id")
+        .eq("user_id", user.id)
+        .maybeSingle();
 
-      if (insertError) {
-        throw insertError;
+      let dbError = null;
+      if (existingResume) {
+        console.log("Updating existing resume record...");
+        const { error } = await supabase
+          .from("resumes")
+          .update({
+            file_name: selectedFile.name,
+            file_url: fileUrl,
+          })
+          .eq("user_id", user.id);
+        dbError = error;
+      } else {
+        console.log("Inserting new resume record...");
+        const { error } = await supabase.from("resumes").insert({
+          user_id: user.id,
+          file_name: selectedFile.name,
+          file_url: fileUrl,
+        });
+        dbError = error;
+      }
+
+      if (dbError) {
+        throw dbError;
       }
       console.log("✅ resumes table updated in database");
 
