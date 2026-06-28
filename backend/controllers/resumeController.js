@@ -8,24 +8,10 @@ const pdfParse = require("pdf-parse");
 const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
 
-// Groq primary (no daily rate limits), Gemini fallback (PDF native support)
+// Gemini primary (native PDF vision), Groq fallback (extracted text)
 async function callAI(prompt, pdfBase64 = null) {
-  // ── Primary: Groq ──────────────────────────────────────────────────
+  // ── Primary: Gemini (reads the actual PDF natively) ──────────────
   try {
-    const groqResponse = await groq.chat.completions.create({
-      model: "llama-3.3-70b-versatile",
-      messages: [{ role: "user", content: prompt }],
-      temperature: 0.2, // Low temperature = deterministic, content-based scoring
-      max_tokens: 1024,
-    });
-
-    console.log("✅ Used: Groq (Llama 3.3 70B)");
-    return groqResponse.choices[0].message.content;
-  } catch (groqErr) {
-    console.warn("⚠️ Groq failed:", groqErr.message);
-    console.log("🔄 Switching to Gemini 2.5 Flash as fallback...");
-
-    // ── Fallback: Gemini (native PDF support) ───────────────────────
     const contents = pdfBase64
       ? [
           { inlineData: { mimeType: "application/pdf", data: pdfBase64 } },
@@ -38,8 +24,22 @@ async function callAI(prompt, pdfBase64 = null) {
       contents,
     });
 
-    console.log("✅ Used: Gemini 2.5 Flash");
+    console.log("✅ Used: Gemini 2.5 Flash (native PDF)");
     return response.text;
+  } catch (geminiErr) {
+    console.warn("⚠️ Gemini failed:", geminiErr.message);
+    console.log("🔄 Falling back to Groq (Llama 3.3 70B)...");
+
+    // ── Fallback: Groq (receives extracted text injected in prompt) ────
+    const groqResponse = await groq.chat.completions.create({
+      model: "llama-3.3-70b-versatile",
+      messages: [{ role: "user", content: prompt }],
+      temperature: 0.2,
+      max_tokens: 1024,
+    });
+
+    console.log("✅ Used: Groq (Llama 3.3 70B) - fallback");
+    return groqResponse.choices[0].message.content;
   }
 }
 

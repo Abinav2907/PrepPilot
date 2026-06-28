@@ -163,12 +163,14 @@ export default function ResumeAnalysisPage() {
             {new Date(resume.created_at).toLocaleDateString()}
           </p>
 
-          <button
-            onClick={() => window.open(resume.file_url, "_blank")}
-            className="mt-4 rounded-xl bg-cyan-600 px-5 py-2"
+          <a
+            href={resume.file_url}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="mt-4 inline-block rounded-xl bg-cyan-600 px-5 py-2 text-white font-semibold hover:bg-cyan-500 transition-colors"
           >
             View Resume
-          </button>
+          </a>
         </div>
       </div>
       {/* SCORE CARDS */}
